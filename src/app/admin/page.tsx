@@ -1,0 +1,508 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Pencil,
+  Save,
+  X,
+  Link2,
+  GraduationCap,
+  BookOpen,
+  ImagePlus,
+} from "lucide-react";
+import { getQuestionBank, saveQuestionsForSubject } from "@/lib/questionsStorage";
+import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/questions";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { uploadQuestionImage } from "@/lib/supabase/questions";
+import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
+
+type EditMode = { type: "add" } | { type: "edit"; index: number };
+
+const newMultiple = (): MultipleChoiceQuestion => ({
+  type: "multiple",
+  id: crypto.randomUUID(),
+  question: "",
+  options: ["", "", "", ""],
+  correctIndex: 0,
+});
+
+const newMatching = (): MatchingQuestion => ({
+  type: "matching",
+  id: crypto.randomUUID(),
+  question: "",
+  pairs: [{ left: "", right: "" }],
+});
+
+export default function AdminTestsPage() {
+  const [grade, setGrade] = useState<Grade>(9);
+  const [subject, setSubject] = useState<SubjectId>("ukrainian");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [edit, setEdit] = useState<EditMode | null>(null);
+  const [draft, setDraft] = useState<Question | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const bank = await getQuestionBank();
+    setQuestions(bank[grade][subject] ?? []);
+    setEdit(null);
+    setDraft(null);
+  }, [grade, subject]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleSaveBank = async () => {
+    await saveQuestionsForSubject(grade, subject, questions);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleAdd = () => {
+    setEdit({ type: "add" });
+    setDraft(newMultiple());
+  };
+
+  const handleEdit = (index: number) => {
+    const q = questions[index];
+    setEdit({ type: "edit", index });
+    setDraft(JSON.parse(JSON.stringify(q)));
+  };
+
+  const handleDelete = async (index: number) => {
+    if (!confirm("Видалити це питання?")) return;
+    const next = questions.filter((_, i) => i !== index);
+    setQuestions(next);
+    await saveQuestionsForSubject(grade, subject, next);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draft) return;
+    if (draft.type === "multiple") {
+      const m = draft as MultipleChoiceQuestion;
+      if (!m.question.trim() || m.options.some((o) => !o.trim())) {
+        alert("Заповніть питання та усі варіанти відповіді.");
+        return;
+      }
+    } else {
+      const mat = draft as MatchingQuestion;
+      if (!mat.question.trim() || mat.pairs.some((p) => !p.left.trim() || !p.right.trim())) {
+        alert("Заповніть питання та усі пари.");
+        return;
+      }
+    }
+    const newList =
+      edit?.type === "add"
+        ? [...questions, draft]
+        : questions.map((q, i) => (i === edit!.index ? draft : q));
+    setQuestions(newList);
+    await saveQuestionsForSubject(grade, subject, newList);
+    setEdit(null);
+    setDraft(null);
+  };
+
+  const moveQuestion = async (index: number, dir: 1 | -1) => {
+    const next = [...questions];
+    const j = index + dir;
+    if (j < 0 || j >= next.length) return;
+    [next[index], next[j]] = [next[j], next[index]];
+    setQuestions(next);
+    await saveQuestionsForSubject(grade, subject, next);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+              aria-label="На головну"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white">
+              <GraduationCap className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-800">
+                Внесення тестів
+              </h1>
+              <p className="text-sm text-slate-500">
+                Додавання та редагування питань за класом і предметом
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin-results"
+            className="text-sm text-primary-600 hover:underline"
+          >
+            Результати →
+          </Link>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Клас:</span>
+            <select
+              value={grade}
+              onChange={(e) => setGrade(Number(e.target.value) as Grade)}
+              className="px-3 py-2 rounded-lg border border-slate-300 bg-white"
+            >
+              {grades.map((g) => (
+                <option key={g} value={g}>
+                  {gradeLabels[g]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-700">Предмет:</span>
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value as SubjectId)}
+              className="px-3 py-2 rounded-lg border border-slate-300 bg-white"
+            >
+              {subjectIds.map((s) => (
+                <option key={s} value={s}>
+                  {subjectLabels[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {saved && (
+            <span className="flex items-center gap-1 text-emerald-600 text-sm">
+              <Save className="w-4 h-4" /> Збережено
+            </span>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <p className="text-sm text-slate-600">
+              Питань: <strong>{questions.length}</strong>
+            </p>
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Додати питання
+            </button>
+          </div>
+
+          {questions.length === 0 && !draft && (
+            <div className="p-12 text-center text-slate-500">
+              Немає питань. Оберіть клас і предмет та натисніть «Додати питання».
+            </div>
+          )}
+
+          <ul className="divide-y divide-slate-100">
+            {questions.map((q, i) => (
+              <li
+                key={q.id}
+                className="flex items-center gap-4 p-4 hover:bg-slate-50/50"
+              >
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveQuestion(i, -1)}
+                    disabled={i === 0}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                    aria-label="Вгору"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveQuestion(i, 1)}
+                    disabled={i === questions.length - 1}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                    aria-label="Вниз"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <span className="text-slate-400 font-mono w-8">{i + 1}.</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">
+                    {q.question || "(без тексту)"}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {q.type === "multiple"
+                      ? "Один з варіантів"
+                      : "Відповідність"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(i)}
+                    className="p-2 rounded-lg text-slate-500 hover:bg-primary-50 hover:text-primary-600"
+                    aria-label="Редагувати"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(i)}
+                    className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
+                    aria-label="Видалити"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {draft && (
+          <div className="mt-8 bg-white rounded-xl border-2 border-primary-200 p-6">
+            <h3 className="font-semibold text-slate-800 mb-4">
+              {edit?.type === "add" ? "Нове питання" : "Редагування"}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Тип
+                </label>
+                <select
+                  value={draft.type}
+                  onChange={(e) => {
+                    setDraft(
+                      e.target.value === "multiple" ? newMultiple() : newMatching()
+                    );
+                  }}
+                  className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xs"
+                >
+                  <option value="multiple">Один з варіантів (4 або 5)</option>
+                  <option value="matching">Відповідність (пари)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Текст питання
+                </label>
+                <textarea
+                  value={draft.question}
+                  onChange={(e) =>
+                    setDraft({ ...draft, question: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  placeholder="Введіть текст питання..."
+                />
+              </div>
+              {isSupabaseConfigured() && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Фото до питання (опційно)
+                  </label>
+                  {(draft as Question & { image_url?: string }).image_url ? (
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-slate-200 overflow-hidden max-w-xs">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={(draft as Question & { image_url?: string }).image_url}
+                          alt="Превʼю"
+                          className="w-full max-h-40 object-contain bg-slate-50"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            image_url: undefined,
+                          } as Question & { image_url?: string })
+                        }
+                        className="text-sm text-red-600 hover:underline"
+                      >
+                        Видалити фото
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={uploadingImage}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setImageError(null);
+                          setUploadingImage(true);
+                          try {
+                            const url = await uploadQuestionImage(file);
+                            setDraft({
+                              ...draft,
+                              image_url: url,
+                            } as Question & { image_url?: string });
+                          } catch (err) {
+                            setImageError(err instanceof Error ? err.message : "Помилка завантаження");
+                          } finally {
+                            setUploadingImage(false);
+                            e.target.value = "";
+                          }
+                        }}
+                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700"
+                      />
+                      {uploadingImage && (
+                        <p className="text-sm text-slate-500 mt-1">Завантаження…</p>
+                      )}
+                      {imageError && (
+                        <p className="text-sm text-red-600 mt-1">{imageError}</p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-1">
+                        Додайте зображення — воно зʼявиться над текстом питання для учнів.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {draft.type === "multiple" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Варіанти відповіді (позначте правильну)
+                  </label>
+                  {(draft as MultipleChoiceQuestion).options.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2 mb-2">
+                      <input
+                        type="radio"
+                        name="correct"
+                        checked={(draft as MultipleChoiceQuestion).correctIndex === i}
+                        onChange={() =>
+                          setDraft({
+                            ...draft,
+                            correctIndex: i,
+                          } as MultipleChoiceQuestion)
+                        }
+                        className="text-primary-600"
+                      />
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => {
+                          const opts = [...(draft as MultipleChoiceQuestion).options];
+                          opts[i] = e.target.value;
+                          setDraft({ ...draft, options: opts } as MultipleChoiceQuestion);
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
+                        placeholder={`Варіант ${i + 1}`}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const opts = (draft as MultipleChoiceQuestion).options;
+                      if (opts.length < 5) {
+                        setDraft({
+                          ...draft,
+                          options: [...opts, ""],
+                        } as MultipleChoiceQuestion);
+                      }
+                    }}
+                    className="text-sm text-primary-600 hover:underline mt-1"
+                  >
+                    + Додати 5-й варіант
+                  </button>
+                </div>
+              )}
+              {draft.type === "matching" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Пари (лівий стовпчик — правий)
+                  </label>
+                  {(draft as MatchingQuestion).pairs.map((pair, i) => (
+                    <div key={i} className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={pair.left}
+                        onChange={(e) => {
+                          const pairs = (draft as MatchingQuestion).pairs.map(
+                            (p, j) => (j === i ? { ...p, left: e.target.value } : p)
+                          );
+                          setDraft({ ...draft, pairs } as MatchingQuestion);
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
+                        placeholder="Лівий елемент"
+                      />
+                      <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={pair.right}
+                        onChange={(e) => {
+                          const pairs = (draft as MatchingQuestion).pairs.map(
+                            (p, j) => (j === i ? { ...p, right: e.target.value } : p)
+                          );
+                          setDraft({ ...draft, pairs } as MatchingQuestion);
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
+                        placeholder="Правий елемент"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft({
+                        ...draft,
+                        pairs: [...(draft as MatchingQuestion).pairs, { left: "", right: "" }],
+                      } as MatchingQuestion);
+                    }}
+                    className="text-sm text-primary-600 hover:underline mt-1"
+                  >
+                    + Додати пару
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium"
+              >
+                <Save className="w-4 h-4" />
+                Зберегти
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEdit(null); setDraft(null); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+              >
+                <X className="w-4 h-4" />
+                Скасувати
+              </button>
+            </div>
+          </div>
+        )}
+
+        {questions.length > 0 && !draft && (
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={handleSaveBank}
+              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium"
+            >
+              Зберегти зміни
+            </button>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
