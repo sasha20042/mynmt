@@ -63,7 +63,7 @@ export async function getQuestionsForBlock(
 ): Promise<{ subject: SubjectId; question: Question; index: number }[]> {
   if (isSupabaseConfigured()) return getQuestionsForBlockFromSupabase(grade, block);
   const bank = getQuestionBankLocal();
-  const subjects = block === 1 ? ["ukrainian", "math"] : ["history", "english"];
+  const subjects: SubjectId[] = block === 1 ? ["ukrainian", "math"] : ["history", "english"];
   const out: { subject: SubjectId; question: Question; index: number }[] = [];
   for (const s of subjects) {
     const list = bank[grade]?.[s] ?? [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
@@ -39,7 +39,7 @@ function computeSubjectScores(
   return out as Record<SubjectId, { correct: number; total: number }>;
 }
 
-export default function TestPage() {
+function TestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { name, invitation, grade, block } = parseParams(searchParams);
@@ -326,5 +326,17 @@ export default function TestPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TestPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <p className="text-slate-600">Завантаження…</p>
+      </div>
+    }>
+      <TestPageContent />
+    </Suspense>
   );
 }
