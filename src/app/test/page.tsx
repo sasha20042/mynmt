@@ -166,7 +166,12 @@ function TestPageContent() {
       history: { correct: 0, total: 0 },
       english: { correct: 0, total: 0 },
     };
-    let block1Details: Record<SubjectId, AnswerDetailItem[]> = {};
+    let block1Details: Record<SubjectId, AnswerDetailItem[]> = {
+      ukrainian: [],
+      math: [],
+      history: [],
+      english: [],
+    };
     if (typeof window !== "undefined") {
       try {
         const raw = sessionStorage.getItem(BLOCK1_STORAGE);
