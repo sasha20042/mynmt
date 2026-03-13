@@ -4,8 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
-import { subjectLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
-import type { Grade, SubjectId, AnswerState } from "@/types";
+import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
+import type { Grade, SubjectId, AnswerState, AnswerDetailItem } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
 
@@ -39,6 +39,30 @@ function computeSubjectScores(
   return out as Record<SubjectId, { correct: number; total: number }>;
 }
 
+function computeAnswerDetails(
+  blockItems: { subject: SubjectId; question: import("@/types").Question }[],
+  answers: Record<string, AnswerState["value"]>
+): Record<SubjectId, AnswerDetailItem[]> {
+  const out: Record<string, AnswerDetailItem[]> = {};
+  for (const { subject, question: q } of blockItems) {
+    if (!out[subject]) out[subject] = [];
+    const val = answers[q.id];
+    let ok = false;
+    if (q.type === "multiple" && typeof val === "number") {
+      ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
+    } else if (q.type === "matching" && Array.isArray(val)) {
+      ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
+    }
+    const snippet = q.question.trim().slice(0, 100);
+    out[subject].push({
+      questionId: q.id,
+      correct: ok,
+      questionSnippet: snippet || undefined,
+    });
+  }
+  return out as Record<SubjectId, AnswerDetailItem[]>;
+}
+
 function TestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,18 +90,21 @@ function TestPageContent() {
       try {
         const raw = sessionStorage.getItem(BLOCK1_STORAGE);
         if (raw) {
-          const block1Scores = JSON.parse(raw);
+          const parsed = JSON.parse(raw) as
+            | { subjectScores?: Record<SubjectId, { correct: number; total: number }>; answerDetails?: Record<SubjectId, import("@/types").AnswerDetailItem[]> }
+            | Record<SubjectId, { correct: number; total: number }>;
           const allScores = {
             ukrainian: { correct: 0, total: 0 },
             math: { correct: 0, total: 0 },
             history: { correct: 0, total: 0 },
             english: { correct: 0, total: 0 },
-            ...block1Scores,
+            ...(parsed && "subjectScores" in parsed ? parsed.subjectScores : parsed),
           };
-          sessionStorage.setItem(
-            "nmt_final_scores",
-            JSON.stringify({ name, invitation, grade, subjects: allScores })
-          );
+          const payload: Record<string, unknown> = { name, invitation, grade, subjects: allScores };
+          if (parsed && "answerDetails" in parsed && parsed.answerDetails) {
+            payload.answerDetails = parsed.answerDetails;
+          }
+          sessionStorage.setItem("nmt_final_scores", JSON.stringify(payload));
           sessionStorage.removeItem(BLOCK1_STORAGE);
           router.replace("/results");
         }
@@ -117,11 +144,16 @@ function TestPageContent() {
     );
     const baseParams = { name, invitation, grade: String(grade) };
 
+    const blockDetails = computeAnswerDetails(
+      blockItems.map((x) => ({ subject: x.subject, question: x.question })),
+      answers
+    );
+
     if (block === 1) {
       if (typeof window !== "undefined") {
         sessionStorage.setItem(
           BLOCK1_STORAGE,
-          JSON.stringify(subjectScores)
+          JSON.stringify({ subjectScores, answerDetails: blockDetails })
         );
       }
       router.push(`/test?${new URLSearchParams({ ...baseParams, block: "2" }).toString()}`);
@@ -134,15 +166,32 @@ function TestPageContent() {
       history: { correct: 0, total: 0 },
       english: { correct: 0, total: 0 },
     };
+    let block1Details: Record<SubjectId, AnswerDetailItem[]> = {};
     if (typeof window !== "undefined") {
       try {
         const raw = sessionStorage.getItem(BLOCK1_STORAGE);
-        if (raw) block1Scores = { ...block1Scores, ...JSON.parse(raw) };
+        if (raw) {
+          const parsed = JSON.parse(raw) as
+            | { subjectScores?: Record<SubjectId, { correct: number; total: number }>; answerDetails?: Record<SubjectId, AnswerDetailItem[]> }
+            | Record<SubjectId, { correct: number; total: number }>;
+          if (parsed && "subjectScores" in parsed && parsed.subjectScores) {
+            block1Scores = { ...block1Scores, ...parsed.subjectScores };
+            if (parsed.answerDetails) block1Details = parsed.answerDetails;
+          } else {
+            block1Scores = { ...block1Scores, ...(parsed as Record<SubjectId, { correct: number; total: number }>) };
+          }
+        }
       } catch {}
     }
     const allScores: Record<SubjectId, { correct: number; total: number }> = {
       ...block1Scores,
       ...subjectScores,
+    };
+    const allDetails: Record<SubjectId, AnswerDetailItem[]> = {
+      ukrainian: [...(block1Details.ukrainian ?? []), ...(blockDetails.ukrainian ?? [])],
+      math: [...(block1Details.math ?? []), ...(blockDetails.math ?? [])],
+      history: [...(block1Details.history ?? []), ...(blockDetails.history ?? [])],
+      english: [...(block1Details.english ?? []), ...(blockDetails.english ?? [])],
     };
     if (typeof window !== "undefined") {
       sessionStorage.setItem("nmt_final_scores", JSON.stringify({
@@ -150,6 +199,7 @@ function TestPageContent() {
         invitation,
         grade,
         subjects: allScores,
+        answerDetails: allDetails,
       }));
       sessionStorage.removeItem(BLOCK1_STORAGE);
     }
@@ -207,7 +257,7 @@ function TestPageContent() {
             <span className="font-medium text-slate-800">
               Блок {block} — {subjectsInBlock.map((s) => subjectLabels[s]).join(", ")}
             </span>
-            <span className="text-slate-500 text-sm">{grade === 10 ? "10–11" : grade} клас</span>
+            <span className="text-slate-500 text-sm">{gradeLabels[grade]}</span>
           </div>
           <div
             className={`flex items-center gap-2 ${

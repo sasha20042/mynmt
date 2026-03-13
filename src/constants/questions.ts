@@ -1,11 +1,12 @@
 import type { Grade, SubjectId } from "@/types";
 
-export const grades: Grade[] = [8, 9, 10];
+export const grades: Grade[] = [8, 9, 10, 11];
 
 export const gradeLabels: Record<Grade, string> = {
   8: "8 клас",
   9: "9 клас",
-  10: "10–11 клас",
+  10: "10 клас",
+  11: "11 клас",
 };
 
 export const subjectIds: SubjectId[] = ["ukrainian", "math", "history", "english"];

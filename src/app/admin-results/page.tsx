@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import Link from "next/link";
-import { Trash2, Filter, ArrowLeft, GraduationCap } from "lucide-react";
+import { Trash2, Filter, ArrowLeft, GraduationCap, ChevronDown, ChevronUp, CheckCircle, XCircle } from "lucide-react";
 import { getStoredResults, deleteResult, clearAllResults } from "@/lib/storage";
-import { subjectLabels, gradeLabels } from "@/constants/questions";
+import { subjectLabels, gradeLabels, grades } from "@/constants/questions";
 import type { TestResult, Grade, SubjectId } from "@/types";
+
+const subjectIds: SubjectId[] = ["ukrainian", "math", "history", "english"];
 
 export default function AdminResultsPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [gradeFilter, setGradeFilter] = useState<Grade | "all">("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadResults = useCallback(() => {
     getStoredResults().then(setResults);
@@ -50,8 +53,6 @@ export default function AdminResultsPage() {
       return iso;
     }
   };
-
-  const subjectIds: SubjectId[] = ["ukrainian", "math", "history", "english"];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -99,9 +100,9 @@ export default function AdminResultsPage() {
               className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm"
             >
               <option value="all">Усі</option>
-              <option value={8}>{gradeLabels[8]}</option>
-              <option value={9}>{gradeLabels[9]}</option>
-              <option value={10}>{gradeLabels[10]}</option>
+              {grades.map((g) => (
+                <option key={g} value={g}>{gradeLabels[g]}</option>
+              ))}
             </select>
           </div>
           <button
@@ -149,42 +150,99 @@ export default function AdminResultsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="border-b border-slate-100 hover:bg-slate-50/50"
-                    >
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        {r.name}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{r.invitation}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {gradeLabels[r.grade]}
-                      </td>
-                      {subjectIds.map((s) => (
-                        <td key={s} className="px-4 py-3 text-slate-600">
-                          {r.subjects[s]?.total != null ? (
-                            <span className="font-medium text-primary-600">
-                              {r.subjects[s].score}%
-                            </span>
-                          ) : (
-                            "—"
-                          )}
+                    <Fragment key={r.id}>
+                      <tr
+                        key={r.id}
+                        className="border-b border-slate-100 hover:bg-slate-50/50"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {r.name}
                         </td>
-                      ))}
-                      <td className="px-4 py-3 text-slate-500 text-sm">
-                        {formatDate(r.date)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(r.id)}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          aria-label="Видалити"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
+                        <td className="px-4 py-3 text-slate-600">{r.invitation}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {gradeLabels[r.grade]}
+                        </td>
+                        {subjectIds.map((s) => (
+                          <td key={s} className="px-4 py-3 text-slate-600">
+                            {r.subjects[s]?.total != null ? (
+                              <span className="font-medium text-primary-600">
+                                {r.subjects[s].score}%
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-slate-500 text-sm">
+                          {formatDate(r.date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            {r.answerDetails && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label={expandedId === r.id ? "Згорнути деталі" : "Деталі по питаннях"}
+                                title="Деталі по питаннях"
+                              >
+                                {expandedId === r.id ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(r.id)}
+                              className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              aria-label="Видалити"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedId === r.id && r.answerDetails && (
+                        <tr key={`${r.id}-details`} className="bg-slate-50/80">
+                          <td colSpan={subjectIds.length + 4} className="px-4 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                              {subjectIds.map((s) => {
+                                const list = r.answerDetails![s];
+                                if (!list?.length) return null;
+                                return (
+                                  <div key={s} className="bg-white rounded-lg border border-slate-200 p-3">
+                                    <p className="font-medium text-slate-700 mb-2">
+                                      {subjectLabels[s]}
+                                    </p>
+                                    <ul className="space-y-1.5">
+                                      {list.map((item, idx) => (
+                                        <li
+                                          key={`${item.questionId}-${idx}`}
+                                          className={`flex items-start gap-2 ${item.correct ? "text-emerald-700" : "text-red-700"}`}
+                                        >
+                                          {item.correct ? (
+                                            <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                          )}
+                                          <span className="break-words">
+                                            {item.questionSnippet
+                                              ? `${item.questionSnippet}${item.questionSnippet.length >= 100 ? "…" : ""}`
+                                              : `Питання ${idx + 1}`}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

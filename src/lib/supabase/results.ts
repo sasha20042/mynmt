@@ -17,6 +17,7 @@ export async function getResultsFromSupabase(): Promise<TestResult[]> {
     grade: row.grade,
     date: row.date,
     subjects: row.subjects || {},
+    answerDetails: row.answer_details ?? undefined,
   })) as TestResult[];
 }
 
@@ -30,6 +31,7 @@ export async function saveResultToSupabase(result: Omit<TestResult, "id">): Prom
     grade: result.grade,
     date: result.date,
     subjects: result.subjects,
+    ...(result.answerDetails && { answer_details: result.answerDetails }),
   });
 }
 

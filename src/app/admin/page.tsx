@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -19,12 +19,13 @@ import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/ques
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { uploadQuestionImage } from "@/lib/supabase/questions";
 import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
+import { generateId } from "@/lib/uuid";
 
 type EditMode = { type: "add" } | { type: "edit"; index: number };
 
 const newMultiple = (): MultipleChoiceQuestion => ({
   type: "multiple",
-  id: crypto.randomUUID(),
+  id: generateId(),
   question: "",
   options: ["", "", "", ""],
   correctIndex: 0,
@@ -32,7 +33,7 @@ const newMultiple = (): MultipleChoiceQuestion => ({
 
 const newMatching = (): MatchingQuestion => ({
   type: "matching",
-  id: crypto.randomUUID(),
+  id: generateId(),
   question: "",
   pairs: [{ left: "", right: "" }],
 });
@@ -45,7 +46,10 @@ export default function AdminTestsPage() {
   const [draft, setDraft] = useState<Question | null>(null);
   const [saved, setSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingOptionIndex, setUploadingOptionIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const draftRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const bank = await getQuestionBank();
@@ -67,12 +71,14 @@ export default function AdminTestsPage() {
   const handleAdd = () => {
     setEdit({ type: "add" });
     setDraft(newMultiple());
+    setTimeout(() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
   };
 
   const handleEdit = (index: number) => {
     const q = questions[index];
     setEdit({ type: "edit", index });
     setDraft(JSON.parse(JSON.stringify(q)));
+    setTimeout(() => draftRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
   };
 
   const handleDelete = async (index: number) => {
@@ -97,14 +103,19 @@ export default function AdminTestsPage() {
         return;
       }
     }
-    const newList =
-      edit?.type === "add"
-        ? [...questions, draft]
-        : questions.map((q, i) => (i === edit!.index ? draft : q));
-    setQuestions(newList);
-    await saveQuestionsForSubject(grade, subject, newList);
-    setEdit(null);
-    setDraft(null);
+    setSaving(true);
+    try {
+      const newList =
+        edit?.type === "add"
+          ? [...questions, draft]
+          : questions.map((q, i) => (i === edit!.index ? draft : q));
+      setQuestions(newList);
+      await saveQuestionsForSubject(grade, subject, newList);
+      setEdit(null);
+      setDraft(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const moveQuestion = async (index: number, dir: 1 | -1) => {
@@ -195,7 +206,7 @@ export default function AdminTestsPage() {
             <button
               type="button"
               onClick={handleAdd}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Додати питання
@@ -269,7 +280,7 @@ export default function AdminTestsPage() {
         </div>
 
         {draft && (
-          <div className="mt-8 bg-white rounded-xl border-2 border-primary-200 p-6">
+          <div ref={draftRef} className="mt-8 bg-white rounded-xl border-2 border-indigo-200 p-6 shadow-sm">
             <h3 className="font-semibold text-slate-800 mb-4">
               {edit?.type === "add" ? "Нове питання" : "Редагування"}
             </h3>
@@ -287,7 +298,7 @@ export default function AdminTestsPage() {
                   }}
                   className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xs"
                 >
-                  <option value="multiple">Один з варіантів (4 або 5)</option>
+                  <option value="multiple">Один з варіантів (до 10)</option>
                   <option value="matching">Відповідність (пари)</option>
                 </select>
               </div>
@@ -357,7 +368,7 @@ export default function AdminTestsPage() {
                             e.target.value = "";
                           }
                         }}
-                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700"
+                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-100 file:text-indigo-800"
                       />
                       {uploadingImage && (
                         <p className="text-sm text-slate-500 mt-1">Завантаження…</p>
@@ -375,49 +386,121 @@ export default function AdminTestsPage() {
               {draft.type === "multiple" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Варіанти відповіді (позначте правильну)
+                    Варіанти відповіді (позначте правильну, можна додати фото до варіанту)
                   </label>
-                  {(draft as MultipleChoiceQuestion).options.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="radio"
-                        name="correct"
-                        checked={(draft as MultipleChoiceQuestion).correctIndex === i}
-                        onChange={() =>
-                          setDraft({
-                            ...draft,
-                            correctIndex: i,
-                          } as MultipleChoiceQuestion)
-                        }
-                        className="text-primary-600"
-                      />
-                      <input
-                        type="text"
-                        value={opt}
-                        onChange={(e) => {
-                          const opts = [...(draft as MultipleChoiceQuestion).options];
-                          opts[i] = e.target.value;
-                          setDraft({ ...draft, options: opts } as MultipleChoiceQuestion);
-                        }}
-                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
-                        placeholder={`Варіант ${i + 1}`}
-                      />
-                    </div>
-                  ))}
+                  {(draft as MultipleChoiceQuestion).options.map((opt, i) => {
+                    const m = draft as MultipleChoiceQuestion;
+                    const optUrls = m.option_image_urls ?? [];
+                    const optImg = optUrls[i];
+                    return (
+                      <div key={i} className="mb-4 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="correct"
+                            checked={m.correctIndex === i}
+                            onChange={() =>
+                              setDraft({ ...draft, correctIndex: i } as MultipleChoiceQuestion)
+                            }
+                            className="text-indigo-600"
+                          />
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const opts = [...m.options];
+                              opts[i] = e.target.value;
+                              setDraft({ ...draft, options: opts } as MultipleChoiceQuestion);
+                            }}
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
+                            placeholder={`Варіант ${i + 1}`}
+                          />
+                        </div>
+                        {isSupabaseConfigured() && (
+                          <div className="ml-6 pl-1">
+                            {optImg ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[120px] max-h-20">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={optImg}
+                                    alt={`Варіант ${i + 1}`}
+                                    className="w-full h-full object-contain bg-slate-50"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = [...(m.option_image_urls ?? [])];
+                                    while (next.length <= i) next.push(undefined);
+                                    next[i] = undefined;
+                                    setDraft({
+                                      ...draft,
+                                      option_image_urls: next,
+                                    } as MultipleChoiceQuestion);
+                                  }}
+                                  className="text-sm text-red-600 hover:underline"
+                                >
+                                  Видалити фото
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  disabled={uploadingOptionIndex !== null}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setImageError(null);
+                                    setUploadingOptionIndex(i);
+                                    try {
+                                      const url = await uploadQuestionImage(file);
+                                      const m2 = draft as MultipleChoiceQuestion;
+                                      const next = [...(m2.option_image_urls ?? [])];
+                                      while (next.length <= i) next.push(undefined);
+                                      next[i] = url;
+                                      setDraft({
+                                        ...draft,
+                                        option_image_urls: next,
+                                      } as MultipleChoiceQuestion);
+                                    } catch (err) {
+                                      setImageError(err instanceof Error ? err.message : "Помилка завантаження");
+                                    } finally {
+                                      setUploadingOptionIndex(null);
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  className="block text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800"
+                                />
+                                {uploadingOptionIndex === i && (
+                                  <p className="text-xs text-slate-500 mt-0.5">Завантаження…</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={() => {
-                      const opts = (draft as MultipleChoiceQuestion).options;
-                      if (opts.length < 5) {
+                      const m = draft as MultipleChoiceQuestion;
+                      const opts = m.options;
+                      if (opts.length < 10) {
+                        const urls = m.option_image_urls ?? [];
                         setDraft({
                           ...draft,
                           options: [...opts, ""],
+                          option_image_urls: [...urls, undefined],
                         } as MultipleChoiceQuestion);
                       }
                     }}
-                    className="text-sm text-primary-600 hover:underline mt-1"
+                    className="text-sm text-indigo-600 hover:underline mt-1"
                   >
-                    + Додати 5-й варіант
+                    + Додати варіант
                   </button>
                 </div>
               )}
@@ -474,15 +557,17 @@ export default function AdminTestsPage() {
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium"
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white font-medium shadow-sm"
               >
                 <Save className="w-4 h-4" />
-                Зберегти
+                {saving ? "Збереження…" : "Зберегти"}
               </button>
               <button
                 type="button"
                 onClick={() => { setEdit(null); setDraft(null); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-medium"
               >
                 <X className="w-4 h-4" />
                 Скасувати
@@ -496,7 +581,7 @@ export default function AdminTestsPage() {
             <button
               type="button"
               onClick={handleSaveBank}
-              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium"
+              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium shadow-sm"
             >
               Зберегти зміни
             </button>

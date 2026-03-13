@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, ArrowRight, Hash } from "lucide-react";
+import { GraduationCap, ArrowRight, Hash, Loader2 } from "lucide-react";
 import { grades, gradeLabels, blockSubjects } from "@/constants/questions";
 import { getQuestionBank } from "@/lib/questionsStorage";
 import type { Grade } from "@/types";
@@ -13,6 +13,7 @@ export default function WelcomePage() {
   const [invitation, setInvitation] = useState("");
   const [grade, setGrade] = useState<Grade | "">("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleStart = async () => {
     setError("");
@@ -28,22 +29,27 @@ export default function WelcomePage() {
       setError("Оберіть клас.");
       return;
     }
-    const bank = await getQuestionBank();
-    const block1Subjects = blockSubjects[1];
-    const hasBlock1 = block1Subjects.some(
-      (s) => (bank[grade]?.[s]?.length ?? 0) > 0
-    );
-    if (!hasBlock1) {
-      setError("Для обраного класу ще не додано питання (блок 1). Зверніться до вчителя.");
-      return;
+    setLoading(true);
+    try {
+      const bank = await getQuestionBank();
+      const block1Subjects = blockSubjects[1];
+      const hasBlock1 = block1Subjects.some(
+        (s) => (bank[grade]?.[s]?.length ?? 0) > 0
+      );
+      if (!hasBlock1) {
+        setError("Для обраного класу ще не додано питання (блок 1). Зверніться до вчителя.");
+        return;
+      }
+      const params = new URLSearchParams({
+        name: name.trim(),
+        invitation: invitation.trim(),
+        grade: String(grade),
+        block: "1",
+      });
+      router.push(`/test?${params.toString()}`);
+    } finally {
+      setLoading(false);
     }
-    const params = new URLSearchParams({
-      name: name.trim(),
-      invitation: invitation.trim(),
-      grade: String(grade),
-      block: "1",
-    });
-    router.push(`/test?${params.toString()}`);
   };
 
   return (
@@ -133,10 +139,20 @@ export default function WelcomePage() {
           <button
             type="button"
             onClick={handleStart}
-            className="mt-8 w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium flex items-center justify-center gap-2 transition"
+            disabled={loading}
+            className="mt-8 w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white font-medium flex items-center justify-center gap-2 transition shadow-md"
           >
-            Почати тест (І блок)
-            <ArrowRight className="w-5 h-5" />
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Завантаження…
+              </>
+            ) : (
+              <>
+                Почати тест (І блок)
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
           </button>
         </div>
 

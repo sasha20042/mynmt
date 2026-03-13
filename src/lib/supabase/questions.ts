@@ -1,5 +1,6 @@
 import type { QuestionBank, Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
 import { grades, subjectIds } from "@/constants/questions";
+import { generateId } from "@/lib/uuid";
 import { createClient } from "./client";
 
 const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "question-images";
@@ -12,16 +13,21 @@ function rowToQuestion(row: {
   correct_index: number | null;
   pairs: { left: string; right: string }[] | null;
   image_url: string | null;
+  option_image_urls?: (string | null)[] | null;
 }): Question {
   if (row.type === "multiple") {
-    return {
+    const q: MultipleChoiceQuestion = {
       type: "multiple",
       id: row.id,
       question: row.question,
       options: row.options || [],
       correctIndex: row.correct_index ?? 0,
-      ...(row.image_url && { image_url: row.image_url }),
-    } as MultipleChoiceQuestion;
+    };
+    if (row.image_url) q.image_url = row.image_url;
+    if (Array.isArray(row.option_image_urls)) {
+      q.option_image_urls = row.option_image_urls.map((u) => u || undefined);
+    }
+    return q;
   }
   return {
     type: "matching",
@@ -42,12 +48,14 @@ function questionToRow(q: Question, grade: Grade, subject: SubjectId, sortOrder:
     image_url: (q as Question & { image_url?: string }).image_url ?? null,
   };
   if (q.type === "multiple") {
+    const m = q as MultipleChoiceQuestion;
     return {
       ...base,
       id: q.id,
-      options: (q as MultipleChoiceQuestion).options,
-      correct_index: (q as MultipleChoiceQuestion).correctIndex,
+      options: m.options,
+      correct_index: m.correctIndex,
       pairs: null,
+      ...(m.option_image_urls?.length && { option_image_urls: m.option_image_urls }),
     };
   }
   return {
@@ -125,7 +133,7 @@ export async function uploadQuestionImage(file: File): Promise<string> {
   if (!supabase) throw new Error("Supabase not configured");
 
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const path = `${Date.now()}-${generateId().slice(0, 8)}.${ext}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     cacheControl: "3600",

@@ -11,10 +11,8 @@ interface FinalScores {
   name: string;
   invitation: string;
   grade: Grade;
-  subjects: Record<
-    SubjectId,
-    { correct: number; total: number }
-  >;
+  subjects: Record<SubjectId, { correct: number; total: number }>;
+  answerDetails?: import("@/types").TestResult["answerDetails"];
 }
 
 const defaultScores: Record<SubjectId, { correct: number; total: number }> = {
@@ -30,40 +28,43 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const raw = sessionStorage.getItem("nmt_final_scores");
+    sessionStorage.removeItem("nmt_final_scores");
+    if (!raw) {
+      router.replace("/");
+      return;
+    }
+    let parsed: FinalScores;
+    try {
+      parsed = JSON.parse(raw) as FinalScores;
+    } catch {
+      router.replace("/");
+      return;
+    }
+    setData(parsed);
+    const subjects: Record<SubjectId, { score: number; total: number; correct: number }> = {
+      ukrainian: { score: 0, total: 0, correct: 0 },
+      math: { score: 0, total: 0, correct: 0 },
+      history: { score: 0, total: 0, correct: 0 },
+      english: { score: 0, total: 0, correct: 0 },
+    };
+    for (const s of Object.keys(defaultScores) as SubjectId[]) {
+      const t = parsed.subjects[s] ?? { correct: 0, total: 0 };
+      subjects[s] = {
+        correct: t.correct,
+        total: t.total,
+        score: t.total ? Math.round((t.correct / t.total) * 100) : 0,
+      };
+    }
     (async () => {
-      try {
-        const raw = sessionStorage.getItem("nmt_final_scores");
-        if (!raw) {
-          router.replace("/");
-          return;
-        }
-        const parsed = JSON.parse(raw) as FinalScores;
-        setData(parsed);
-        const subjects: Record<SubjectId, { score: number; total: number; correct: number }> = {
-          ukrainian: { score: 0, total: 0, correct: 0 },
-          math: { score: 0, total: 0, correct: 0 },
-          history: { score: 0, total: 0, correct: 0 },
-          english: { score: 0, total: 0, correct: 0 },
-        };
-        for (const s of Object.keys(defaultScores) as SubjectId[]) {
-          const t = parsed.subjects[s] ?? { correct: 0, total: 0 };
-          subjects[s] = {
-            correct: t.correct,
-            total: t.total,
-            score: t.total ? Math.round((t.correct / t.total) * 100) : 0,
-          };
-        }
-        await saveResult({
-          name: parsed.name,
-          invitation: parsed.invitation,
-          grade: parsed.grade,
-          date: new Date().toISOString(),
-          subjects,
-        });
-        sessionStorage.removeItem("nmt_final_scores");
-      } catch {
-        router.replace("/");
-      }
+      await saveResult({
+        name: parsed.name,
+        invitation: parsed.invitation,
+        grade: parsed.grade,
+        date: new Date().toISOString(),
+        subjects,
+        ...(parsed.answerDetails && { answerDetails: parsed.answerDetails }),
+      });
     })();
   }, [router]);
 

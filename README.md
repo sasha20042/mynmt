@@ -16,7 +16,22 @@ npm install
 npm run dev
 ```
 
-Відкрийте [http://localhost:3000](http://localhost:3000). Без змінних Supabase тести та результати зберігаються в localStorage.
+Відкрийте [http://localhost:3000](http://localhost:3000). Без змінних Supabase/Airtable тести та результати зберігаються в localStorage.
+
+---
+
+## Підключення Airtable
+
+Якщо використовуєш Airtable для питань і результатів:
+
+1. У **.env.local** мають бути:
+   - `AIRTABLE_API_KEY` — Personal Access Token ([airtable.com/create/tokens](https://airtable.com/create/tokens))
+   - `AIRTABLE_BASE_ID` — **Base ID** з URL бази (частина **appXXXXXXXXXX**, не table id `tbl...`). Відкрий базу в Airtable — у рядку буде `https://airtable.com/appXXXXXXXXXX/...`
+   - `NEXT_PUBLIC_USE_AIRTABLE=true`
+
+2. Таблиці в базі: **Questions** (питання з полями Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, Image) та **Results** (Name, Invitation, Grade, Date, Subjects).
+
+3. Після перезапуску (`npm run dev`) застосунок читає/пише питання та результати через Airtable.
 
 ---
 
@@ -54,7 +69,7 @@ npm run dev
 
 ## Функціонал
 
-- **Головна** (`/`) — ПІБ, номер запрошення, клас (8, 9, 10–11). Старт тесту (спочатку І блок).
+- **Головна** (`/`) — ПІБ, номер запрошення, клас (8, 9, 10, 11). Старт тесту (спочатку І блок).
 - **Тест** — І блок: українська мова + математика (1 год); ІІ блок: історія + англійська (1 год). Таймер, навігація по питаннях, підтримка **фото до питання**.
 - **Результати** (`/results`) — бали по всіх 4 предметах, збереження в Supabase або localStorage.
 - **Результати вчителя** (`/admin-results`) — таблиця з фільтром за класом.

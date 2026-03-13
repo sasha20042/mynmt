@@ -1,5 +1,5 @@
-/** 8 клас, 9 клас, 10-11 клас */
-export type Grade = 8 | 9 | 10;
+/** 8, 9, 10, 11 клас */
+export type Grade = 8 | 9 | 10 | 11;
 
 export type SubjectId = "math" | "history" | "ukrainian" | "english";
 
@@ -21,6 +21,8 @@ export interface MultipleChoiceQuestion {
   correctIndex: number;
   /** URL фото до питання (Supabase Storage або зовнішнє) */
   image_url?: string;
+  /** URL фото до варіантів відповіді (індекс = options), опційно для кожного варіанту */
+  option_image_urls?: (string | undefined)[];
 }
 
 export interface MatchingPair {
@@ -48,6 +50,14 @@ export interface SubjectScore {
   correct: number;
 }
 
+/** Один пункт деталізації: питання та чи правильна відповідь */
+export interface AnswerDetailItem {
+  questionId: string;
+  correct: boolean;
+  /** Короткий текст питання для відображення вчителю */
+  questionSnippet?: string;
+}
+
 /** Один запис = одна сесія тесту (обидва блоки, 4 предмети) */
 export interface TestResult {
   id: string;
@@ -56,6 +66,8 @@ export interface TestResult {
   grade: Grade;
   date: string;
   subjects: Record<SubjectId, SubjectScore>;
+  /** По предметам — список питань і чи правильна відповідь (для деталізації в адмінці) */
+  answerDetails?: Record<SubjectId, AnswerDetailItem[]>;
 }
 
 export interface AnswerState {

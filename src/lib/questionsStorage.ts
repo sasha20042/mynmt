@@ -9,6 +9,10 @@ import {
 
 const STORAGE_KEY = "nmt_questions";
 
+function useAirtable(): boolean {
+  return typeof window !== "undefined" && process.env.NEXT_PUBLIC_USE_AIRTABLE === "true";
+}
+
 function emptyBank(): QuestionBank {
   const bank = {} as QuestionBank;
   for (const g of grades) {
@@ -40,15 +44,38 @@ function getQuestionBankLocal(): QuestionBank {
 }
 
 export async function getQuestionBank(): Promise<QuestionBank> {
+  if (useAirtable()) {
+    try {
+      const res = await fetch("/api/questions");
+      const data = await res.json();
+      if (res.ok && data.bank) return data.bank;
+      return emptyBank();
+    } catch {
+      return emptyBank();
+    }
+  }
   if (isSupabaseConfigured()) return getQuestionBankFromSupabase();
   return Promise.resolve(getQuestionBankLocal());
 }
 
-export function saveQuestionsForSubject(
+export async function saveQuestionsForSubject(
   grade: Grade,
   subject: SubjectId,
   questions: Question[]
 ): Promise<void> {
+  if (useAirtable()) {
+    try {
+      const res = await fetch("/api/questions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grade, subject, questions }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+    } catch (e) {
+      console.error(e);
+    }
+    return;
+  }
   if (isSupabaseConfigured()) return saveQuestionsForSubjectToSupabase(grade, subject, questions);
   if (typeof window === "undefined") return Promise.resolve();
   const bank = getQuestionBankLocal();
@@ -61,13 +88,23 @@ export async function getQuestionsForBlock(
   grade: Grade,
   block: 1 | 2
 ): Promise<{ subject: SubjectId; question: Question; index: number }[]> {
+  if (useAirtable()) {
+    const bank = await getQuestionBank();
+    const subjects: SubjectId[] = block === 1 ? ["ukrainian", "math"] : ["history", "english"];
+    const out: { subject: SubjectId; question: Question; index: number }[] = [];
+    for (const s of subjects) {
+      const list = bank[grade]?.[s] ?? [];
+      list.forEach((q, i) => out.push({ subject: s, question: q, index: i }));
+    }
+    return out;
+  }
   if (isSupabaseConfigured()) return getQuestionsForBlockFromSupabase(grade, block);
   const bank = getQuestionBankLocal();
   const subjects: SubjectId[] = block === 1 ? ["ukrainian", "math"] : ["history", "english"];
   const out: { subject: SubjectId; question: Question; index: number }[] = [];
   for (const s of subjects) {
     const list = bank[grade]?.[s] ?? [];
-    list.forEach((q, i) => out.push({ subject: s as SubjectId, question: q, index: i }));
+    list.forEach((q, i) => out.push({ subject: s, question: q, index: i }));
   }
   return out;
 }
