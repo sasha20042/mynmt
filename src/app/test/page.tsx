@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
 import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
-import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question } from "@/types";
+import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
+import { QuestionShortAnswer } from "@/components/QuestionShortAnswer";
 
 const BLOCK1_STORAGE = "nmt_block1_scores";
 
@@ -22,6 +23,18 @@ function parseParams(searchParams: ReturnType<typeof useSearchParams>) {
 function getWeight(q: Question): number {
   const w = (q as Question & { weight?: number }).weight;
   return typeof w === "number" && w > 0 ? w : 1;
+}
+
+/** Порівняння відповіді "своя відповідь": числа з допуском, інакше рядки без урахування регістру */
+function isShortAnswerCorrect(userValue: string | undefined, correctAnswer: string): boolean {
+  const u = String(userValue ?? "").trim().replace(/,/g, ".");
+  const c = correctAnswer.trim().replace(/,/g, ".");
+  const uNum = parseFloat(u);
+  const cNum = parseFloat(c);
+  if (!Number.isNaN(uNum) && !Number.isNaN(cNum)) {
+    return Math.abs(uNum - cNum) < 1e-6;
+  }
+  return u.toLowerCase() === c.toLowerCase();
 }
 
 function computeSubjectScores(
@@ -39,6 +52,8 @@ function computeSubjectScores(
       ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
     } else if (q.type === "matching" && Array.isArray(val)) {
       ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
+    } else if (q.type === "short_answer" && typeof val === "string") {
+      ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
     }
     if (ok) out[subject].correct += w;
   }
@@ -58,6 +73,8 @@ function computeAnswerDetails(
       ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
     } else if (q.type === "matching" && Array.isArray(val)) {
       ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
+    } else if (q.type === "short_answer" && typeof val === "string") {
+      ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
     }
     const snippet = q.question.trim().slice(0, 100);
     out[subject].push({
@@ -342,6 +359,13 @@ function TestPageContent() {
                   <QuestionMatching
                     question={currentQuestion as import("@/types").MatchingQuestion}
                     value={answers[currentQuestion.id] as number[] | undefined}
+                    onChange={(v) => setAnswer(currentQuestion.id, v)}
+                  />
+                )}
+                {currentQuestion.type === "short_answer" && (
+                  <QuestionShortAnswer
+                    question={currentQuestion as ShortAnswerQuestion}
+                    value={answers[currentQuestion.id] as string | undefined}
                     onChange={(v) => setAnswer(currentQuestion.id, v)}
                   />
                 )}

@@ -43,7 +43,19 @@ export interface MatchingQuestion {
   weight?: number;
 }
 
-export type Question = MultipleChoiceQuestion | MatchingQuestion;
+/** Своя відповідь: учень вводить число або текст, порівняння з правильним варіантом */
+export interface ShortAnswerQuestion {
+  type: "short_answer";
+  id: string;
+  question: string;
+  /** Правильна відповідь (число або текст для порівняння) */
+  correctAnswer: string;
+  /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
+  weight?: number;
+  image_url?: string;
+}
+
+export type Question = MultipleChoiceQuestion | MatchingQuestion | ShortAnswerQuestion;
 
 export type QuestionBank = Record<Grade, Record<SubjectId, Question[]>>;
 
@@ -76,7 +88,7 @@ export interface TestResult {
 
 export interface AnswerState {
   questionId: string;
-  type: "multiple" | "matching";
-  value: number | number[];
+  type: "multiple" | "matching" | "short_answer";
+  value: number | number[] | string;
   correct: boolean;
 }

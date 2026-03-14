@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getQuestionBank, saveQuestionsForSubject } from "@/lib/questionsStorage";
 import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/questions";
-import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
+import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion, ShortAnswerQuestion } from "@/types";
 import { generateId } from "@/lib/uuid";
 
 type EditMode = { type: "add" } | { type: "edit"; index: number };
@@ -60,6 +60,14 @@ const newMatching = (): MatchingQuestion => ({
   id: generateId(),
   question: "",
   pairs: [{ left: "", right: "" }],
+  weight: 1,
+});
+
+const newShortAnswer = (): ShortAnswerQuestion => ({
+  type: "short_answer",
+  id: generateId(),
+  question: "",
+  correctAnswer: "",
   weight: 1,
 });
 
@@ -127,6 +135,12 @@ export default function AdminTestsPage() {
       const m = draft as MultipleChoiceQuestion;
       if (!m.question.trim() || m.options.some((o) => !o.trim())) {
         alert("Заповніть питання та усі варіанти відповіді.");
+        return;
+      }
+    } else if (draft.type === "short_answer") {
+      const s = draft as ShortAnswerQuestion;
+      if (!s.question.trim() || !s.correctAnswer.trim()) {
+        alert("Заповніть питання та правильну відповідь.");
         return;
       }
     } else {
@@ -292,7 +306,9 @@ export default function AdminTestsPage() {
                   <p className="text-xs text-slate-500 mt-0.5">
                     {q.type === "multiple"
                       ? "Один з варіантів"
-                      : "Відповідність"}
+                      : q.type === "short_answer"
+                        ? "Своя відповідь"
+                        : "Відповідність"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -331,14 +347,16 @@ export default function AdminTestsPage() {
                 <select
                   value={draft.type}
                   onChange={(e) => {
+                    const v = e.target.value;
                     setDraft(
-                      e.target.value === "multiple" ? newMultiple() : newMatching()
+                      v === "multiple" ? newMultiple() : v === "short_answer" ? newShortAnswer() : newMatching()
                     );
                   }}
                   className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xs"
                 >
                   <option value="multiple">Один з варіантів (до 10)</option>
                   <option value="matching">Відповідність (пари)</option>
+                  <option value="short_answer">Своя відповідь (число/текст)</option>
                 </select>
               </div>
               <div>
@@ -499,6 +517,28 @@ export default function AdminTestsPage() {
                   </div>
                 )}
               </div>
+              {draft.type === "short_answer" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Правильна відповідь
+                  </label>
+                  <input
+                    type="text"
+                    value={(draft as ShortAnswerQuestion).correctAnswer}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        correctAnswer: e.target.value,
+                      } as ShortAnswerQuestion)
+                    }
+                    className="w-full max-w-md px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    placeholder="Наприклад: 42 або 3,14"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Числа порівнюються з допуском; кому можна заміняти крапкою.
+                  </p>
+                </div>
+              )}
               {draft.type === "multiple" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">

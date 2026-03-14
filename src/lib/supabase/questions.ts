@@ -1,4 +1,4 @@
-import type { QuestionBank, Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
+import type { QuestionBank, Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion, ShortAnswerQuestion } from "@/types";
 import { grades, subjectIds } from "@/constants/questions";
 import { generateId } from "@/lib/uuid";
 import { createClient } from "./client";
@@ -12,6 +12,7 @@ function rowToQuestion(row: {
   options: string[] | null;
   correct_index: number | null;
   pairs: { left: string; right: string }[] | null;
+  correct_answer?: string | null;
   image_url: string | null;
   option_image_urls?: (string | null)[] | null;
   weight?: number | null;
@@ -28,6 +29,19 @@ function rowToQuestion(row: {
     if (Array.isArray(row.option_image_urls)) {
       q.option_image_urls = row.option_image_urls.map((u) => u || undefined);
     }
+    if (typeof row.weight === "number" && !Number.isNaN(row.weight)) {
+      q.weight = row.weight;
+    }
+    return q;
+  }
+  if (row.type === "short_answer") {
+    const q: ShortAnswerQuestion = {
+      type: "short_answer",
+      id: row.id,
+      question: row.question,
+      correctAnswer: String(row.correct_answer ?? "").trim(),
+    };
+    if (row.image_url) q.image_url = row.image_url;
     if (typeof row.weight === "number" && !Number.isNaN(row.weight)) {
       q.weight = row.weight;
     }
@@ -64,7 +78,19 @@ function questionToRow(q: Question, grade: Grade, subject: SubjectId, sortOrder:
       options: m.options,
       correct_index: m.correctIndex,
       pairs: null,
+      correct_answer: null,
       ...(m.option_image_urls?.length && { option_image_urls: m.option_image_urls }),
+    };
+  }
+  if (q.type === "short_answer") {
+    const s = q as ShortAnswerQuestion;
+    return {
+      ...base,
+      id: q.id,
+      options: null,
+      correct_index: null,
+      pairs: null,
+      correct_answer: s.correctAnswer,
     };
   }
   return {
@@ -73,6 +99,7 @@ function questionToRow(q: Question, grade: Grade, subject: SubjectId, sortOrder:
     options: null,
     correct_index: null,
     pairs: (q as MatchingQuestion).pairs,
+    correct_answer: null,
   };
 }
 

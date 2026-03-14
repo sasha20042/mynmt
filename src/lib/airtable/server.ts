@@ -5,6 +5,7 @@ import type {
   Question,
   MultipleChoiceQuestion,
   MatchingQuestion,
+  ShortAnswerQuestion,
   TestResult,
 } from "@/types";
 import { grades, subjectIds } from "@/constants/questions";
@@ -72,8 +73,9 @@ interface AirtableQuestionFields {
   Options?: string;
   CorrectIndex?: number;
   Pairs?: string;
+  /** Для типу short_answer — правильна відповідь (число або текст) */
+  CorrectAnswer?: string;
   Image?: { url: string }[];
-  /** JSON array of image URLs for options (same order as Options) */
   OptionImages?: string;
   Weight?: number;
 }
@@ -101,6 +103,19 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
       } catch {
         /* ignore */
       }
+    }
+    return q;
+  }
+  if (f.Type === "short_answer") {
+    const q: ShortAnswerQuestion = {
+      type: "short_answer",
+      id: record.id,
+      question: f.Question || "",
+      correctAnswer: String(f.CorrectAnswer ?? "").trim(),
+    };
+    if (imageUrl) q.image_url = imageUrl;
+    if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
+      q.weight = f.Weight;
     }
     return q;
   }
@@ -173,15 +188,24 @@ function questionToFields(
     fields.Options = JSON.stringify(m.options);
     fields.CorrectIndex = m.correctIndex;
     fields.Pairs = null;
+    fields.CorrectAnswer = null;
     if (m.option_image_urls?.length) {
       fields.OptionImages = JSON.stringify(m.option_image_urls);
     }
     fields.Weight = (m as MultipleChoiceQuestion & { weight?: number }).weight ?? 1;
+  } else if (q.type === "short_answer") {
+    const s = q as ShortAnswerQuestion;
+    fields.Options = null;
+    fields.CorrectIndex = null;
+    fields.Pairs = null;
+    fields.CorrectAnswer = s.correctAnswer;
+    fields.Weight = s.weight ?? 1;
   } else {
     const mat = q as MatchingQuestion;
     fields.Options = null;
     fields.CorrectIndex = null;
     fields.Pairs = JSON.stringify(mat.pairs);
+    fields.CorrectAnswer = null;
     fields.Weight = (mat as MatchingQuestion & { weight?: number }).weight ?? 1;
   }
   const imgUrl = (q as Question & { image_url?: string }).image_url;
