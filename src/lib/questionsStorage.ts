@@ -64,15 +64,14 @@ export async function saveQuestionsForSubject(
   questions: Question[]
 ): Promise<void> {
   if (useAirtable()) {
-    try {
-      const res = await fetch("/api/questions", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grade, subject, questions }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-    } catch (e) {
-      console.error(e);
+    const res = await fetch("/api/questions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grade, subject, questions }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error || `Помилка збереження (${res.status})`);
     }
     return;
   }

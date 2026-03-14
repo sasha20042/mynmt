@@ -88,9 +88,13 @@ export default function AdminTestsPage() {
   }, [load]);
 
   const handleSaveBank = async () => {
-    await saveQuestionsForSubject(grade, subject, questions);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      await saveQuestionsForSubject(grade, subject, questions);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Помилка збереження");
+    }
   };
 
   const handleAdd = () => {
@@ -109,8 +113,12 @@ export default function AdminTestsPage() {
   const handleDelete = async (index: number) => {
     if (!confirm("Видалити це питання?")) return;
     const next = questions.filter((_, i) => i !== index);
-    setQuestions(next);
-    await saveQuestionsForSubject(grade, subject, next);
+    try {
+      await saveQuestionsForSubject(grade, subject, next);
+      setQuestions(next);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Помилка видалення");
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -134,10 +142,12 @@ export default function AdminTestsPage() {
         edit?.type === "add"
           ? [...questions, draft]
           : questions.map((q, i) => (i === edit!.index ? draft : q));
-      setQuestions(newList);
       await saveQuestionsForSubject(grade, subject, newList);
+      setQuestions(newList);
       setEdit(null);
       setDraft(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Помилка збереження питань");
     } finally {
       setSaving(false);
     }
@@ -148,8 +158,12 @@ export default function AdminTestsPage() {
     const j = index + dir;
     if (j < 0 || j >= next.length) return;
     [next[index], next[j]] = [next[j], next[index]];
-    setQuestions(next);
-    await saveQuestionsForSubject(grade, subject, next);
+    try {
+      await saveQuestionsForSubject(grade, subject, next);
+      setQuestions(next);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Помилка збереження");
+    }
   };
 
   return (

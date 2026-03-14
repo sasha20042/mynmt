@@ -30,11 +30,13 @@ npm run dev
    - `NEXT_PUBLIC_USE_AIRTABLE=true`
 
 2. Таблиці в базі:
-   - **Questions** — Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, Image, OptionImages, Weight.
+   - **Questions** — Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, Image, OptionImages, Weight. (Назву таблиці можна змінити через `AIRTABLE_QUESTIONS_TABLE` у .env.)
    - **Results** — Name, Invitation, Grade, Date, Subjects, AnswerDetails.
    - **ImageStorage** — для фото питань/відповідей: поля **Content** (Long text, base64) та **Type** (Single line text, напр. `image/png`). Макс. розмір зображення ~70 КБ.
 
-3. Після перезапуску (`npm run dev`) застосунок читає/пише питання та результати через Airtable; фото зберігаються в таблиці ImageStorage і віддаються через `/api/image?id=...`.
+3. **Токен Airtable** має мати доступ на читання та запис до всіх цих таблиць у базі (при створенні токена в [airtable.com/create/tokens](https://airtable.com/create/tokens) оберіть потрібну базу й права **data.records:read** та **data.records:write**).
+
+4. Після перезапуску (`npm run dev`) застосунок читає/пише питання та результати через Airtable; фото зберігаються в таблиці ImageStorage і віддаються через `/api/image?id=...`. Якщо питання не зберігаються — у адмінці з’явиться текст помилки від Airtable (перевір назву таблиці та права токена).
 
 ---
 

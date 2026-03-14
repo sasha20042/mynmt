@@ -194,22 +194,31 @@ export async function replaceQuestionsForSubject(
   subject: string,
   questions: Question[]
 ): Promise<void> {
-  if (!isAirtableConfigured()) return;
+  if (!isAirtableConfigured()) {
+    throw new Error("Airtable not configured (AIRTABLE_BASE_ID, AIRTABLE_API_KEY)");
+  }
   const listUrl = `https://api.airtable.com/v0/${BASE_ID}/${QUESTIONS_TABLE}?filterByFormula=AND({Grade}=${grade}, {Subject}='${subject}')`;
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${API_KEY}` },
   }).then((r) => r.json());
+  if (listRes.error) {
+    throw new Error(listRes.error.message || "Airtable: failed to list questions");
+  }
   if (listRes.records?.length) {
     for (const rec of listRes.records) {
-      await fetch(`https://api.airtable.com/v0/${BASE_ID}/${QUESTIONS_TABLE}/${rec.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${API_KEY}` },
-      });
+      const delRes = await fetch(
+        `https://api.airtable.com/v0/${BASE_ID}/${QUESTIONS_TABLE}/${rec.id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` } }
+      );
+      if (!delRes.ok) {
+        const err = await delRes.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Airtable: delete failed ${delRes.status}`);
+      }
     }
   }
   for (let i = 0; i < questions.length; i++) {
     const fields = questionToFields(questions[i], grade, subject, i);
-    await fetch(`https://api.airtable.com/v0/${BASE_ID}/${QUESTIONS_TABLE}`, {
+    const postRes = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${QUESTIONS_TABLE}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${API_KEY}`,
@@ -217,6 +226,12 @@ export async function replaceQuestionsForSubject(
       },
       body: JSON.stringify({ fields }),
     });
+    if (!postRes.ok) {
+      const err = await postRes.json().catch(() => ({}));
+      throw new Error(
+        err.error?.message || `Airtable: failed to create question (${postRes.status})`
+      );
+    }
   }
 }
 
