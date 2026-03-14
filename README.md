@@ -29,9 +29,12 @@ npm run dev
    - `AIRTABLE_BASE_ID` — **Base ID** з URL бази (частина **appXXXXXXXXXX**, не table id `tbl...`). Відкрий базу в Airtable — у рядку буде `https://airtable.com/appXXXXXXXXXX/...`
    - `NEXT_PUBLIC_USE_AIRTABLE=true`
 
-2. Таблиці в базі: **Questions** (питання з полями Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, Image) та **Results** (Name, Invitation, Grade, Date, Subjects).
+2. Таблиці в базі:
+   - **Questions** — Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, Image, OptionImages, Weight.
+   - **Results** — Name, Invitation, Grade, Date, Subjects, AnswerDetails.
+   - **ImageStorage** — для фото питань/відповідей: поля **Content** (Long text, base64) та **Type** (Single line text, напр. `image/png`). Макс. розмір зображення ~70 КБ.
 
-3. Після перезапуску (`npm run dev`) застосунок читає/пише питання та результати через Airtable.
+3. Після перезапуску (`npm run dev`) застосунок читає/пише питання та результати через Airtable; фото зберігаються в таблиці ImageStorage і віддаються через `/api/image?id=...`.
 
 ---
 

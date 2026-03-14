@@ -16,12 +16,35 @@ import {
 } from "lucide-react";
 import { getQuestionBank, saveQuestionsForSubject } from "@/lib/questionsStorage";
 import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/questions";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { uploadQuestionImage } from "@/lib/supabase/questions";
 import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion } from "@/types";
 import { generateId } from "@/lib/uuid";
 
 type EditMode = { type: "add" } | { type: "edit"; index: number };
+
+/** Завантажує зображення в Airtable через API, повертає URL */
+async function processImageBlob(blob: Blob): Promise<string> {
+  const file = new File(
+    [blob],
+    blob.type.startsWith("image/") ? "image.png" : "paste.png",
+    { type: blob.type }
+  );
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/api/upload-image", { method: "POST", body: formData });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Помилка ${res.status}`);
+  }
+  const { url } = (await res.json()) as { url: string };
+  return url;
+}
+
+function getImageFromClipboardItem(item: ClipboardItem): Promise<Blob | null> {
+  for (const type of item.types) {
+    if (type.startsWith("image/")) return item.getType(type);
+  }
+  return Promise.resolve(null);
+}
 
 const newMultiple = (): MultipleChoiceQuestion => ({
   type: "multiple",
@@ -338,73 +361,130 @@ export default function AdminTestsPage() {
                   </span>
                 </div>
               </div>
-              {isSupabaseConfigured() && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Фото до питання (опційно)
-                  </label>
-                  {(draft as Question & { image_url?: string }).image_url ? (
-                    <div className="space-y-2">
-                      <div className="rounded-lg border border-slate-200 overflow-hidden max-w-xs">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={(draft as Question & { image_url?: string }).image_url}
-                          alt="Превʼю"
-                          className="w-full max-h-40 object-contain bg-slate-50"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Фото до питання (опційно)
+                </label>
+                {(draft as Question & { image_url?: string }).image_url ? (
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-slate-200 overflow-hidden max-w-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={(draft as Question & { image_url?: string }).image_url}
+                        alt="Превʼю"
+                        className="w-full max-h-40 object-contain bg-slate-50"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          image_url: undefined,
+                        } as Question & { image_url?: string })
+                      }
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Видалити фото
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/50 p-4 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-400"
+                    tabIndex={0}
+                    onPaste={async (e) => {
+                      const file = e.clipboardData?.files?.[0];
+                      if (!file?.type.startsWith("image/")) return;
+                      e.preventDefault();
+                      setImageError(null);
+                      setUploadingImage(true);
+                      try {
+                        const url = await processImageBlob(file);
+                        setDraft({
+                          ...draft,
+                          image_url: url,
+                        } as Question & { image_url?: string });
+                      } catch (err) {
+                        setImageError(err instanceof Error ? err.message : "Помилка вставки");
+                      } finally {
+                        setUploadingImage(false);
+                      }
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingImage}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setImageError(null);
+                        setUploadingImage(true);
+                        try {
+                          const url = await processImageBlob(file);
                           setDraft({
                             ...draft,
-                            image_url: undefined,
-                          } as Question & { image_url?: string })
+                            image_url: url,
+                          } as Question & { image_url?: string });
+                        } catch (err) {
+                          setImageError(err instanceof Error ? err.message : "Помилка завантаження");
+                        } finally {
+                          setUploadingImage(false);
+                          e.target.value = "";
                         }
-                        className="text-sm text-red-600 hover:underline"
-                      >
-                        Видалити фото
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        accept="image/*"
+                      }}
+                      className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-100 file:text-indigo-800"
+                    />
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <button
+                        type="button"
                         disabled={uploadingImage}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          setImageError(null);
-                          setUploadingImage(true);
+                        onClick={async () => {
                           try {
-                            const url = await uploadQuestionImage(file);
-                            setDraft({
-                              ...draft,
-                              image_url: url,
-                            } as Question & { image_url?: string });
+                            const items = await navigator.clipboard.read();
+                            for (const item of items) {
+                              const blob = await getImageFromClipboardItem(item);
+                              if (blob) {
+                                setImageError(null);
+                                setUploadingImage(true);
+                                try {
+                                  const url = await processImageBlob(blob);
+                                  setDraft({
+                                    ...draft,
+                                    image_url: url,
+                                  } as Question & { image_url?: string });
+                                } finally {
+                                  setUploadingImage(false);
+                                }
+                                return;
+                              }
+                            }
+                            setImageError("У буфері обміну немає зображення");
                           } catch (err) {
-                            setImageError(err instanceof Error ? err.message : "Помилка завантаження");
-                          } finally {
-                            setUploadingImage(false);
-                            e.target.value = "";
+                            setImageError(err instanceof Error ? err.message : "Немає доступу до буфера");
                           }
                         }}
-                        className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-100 file:text-indigo-800"
-                      />
-                      {uploadingImage && (
-                        <p className="text-sm text-slate-500 mt-1">Завантаження…</p>
-                      )}
-                      {imageError && (
-                        <p className="text-sm text-red-600 mt-1">{imageError}</p>
-                      )}
-                      <p className="text-xs text-slate-500 mt-1">
-                        Додайте зображення — воно зʼявиться над текстом питання для учнів.
-                      </p>
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-800 text-sm font-medium hover:bg-indigo-200 disabled:opacity-70"
+                      >
+                        <ImagePlus className="w-4 h-4" />
+                        Вставити з буфера
+                      </button>
+                      <span className="text-xs text-slate-500">
+                        або натисніть тут і Ctrl+V
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
+                    {uploadingImage && (
+                      <p className="text-sm text-slate-500 mt-1">Завантаження…</p>
+                    )}
+                    {imageError && (
+                      <p className="text-sm text-red-600 mt-1">{imageError}</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      Файл або вставка з буфера. Зображення зберігаються в Airtable (~70 КБ макс).
+                    </p>
+                  </div>
+                )}
+              </div>
               {draft.type === "multiple" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -438,71 +518,131 @@ export default function AdminTestsPage() {
                             placeholder={`Варіант ${i + 1}`}
                           />
                         </div>
-                        {isSupabaseConfigured() && (
-                          <div className="ml-6 pl-1">
-                            {optImg ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[120px] max-h-20">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={optImg}
-                                    alt={`Варіант ${i + 1}`}
-                                    className="w-full h-full object-contain bg-slate-50"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = [...(m.option_image_urls ?? [])];
+                        <div className="ml-6 pl-1">
+                          {optImg ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[120px] max-h-20">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={optImg}
+                                  alt={`Варіант ${i + 1}`}
+                                  className="w-full h-full object-contain bg-slate-50"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...(m.option_image_urls ?? [])];
+                                  while (next.length <= i) next.push(undefined);
+                                  next[i] = undefined;
+                                  setDraft({
+                                    ...draft,
+                                    option_image_urls: next,
+                                  } as MultipleChoiceQuestion);
+                                }}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Видалити фото
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              className="rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-2 inline-block focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-400"
+                              tabIndex={0}
+                              onPaste={async (e) => {
+                                const file = e.clipboardData?.files?.[0];
+                                if (!file?.type.startsWith("image/")) return;
+                                e.preventDefault();
+                                setImageError(null);
+                                setUploadingOptionIndex(i);
+                                try {
+                                  const url = await processImageBlob(file);
+                                  const m2 = draft as MultipleChoiceQuestion;
+                                  const next = [...(m2.option_image_urls ?? [])];
+                                  while (next.length <= i) next.push(undefined);
+                                  next[i] = url;
+                                  setDraft({
+                                    ...draft,
+                                    option_image_urls: next,
+                                  } as MultipleChoiceQuestion);
+                                } catch (err) {
+                                  setImageError(err instanceof Error ? err.message : "Помилка вставки");
+                                } finally {
+                                  setUploadingOptionIndex(null);
+                                }
+                              }}
+                            >
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={uploadingOptionIndex !== null}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setImageError(null);
+                                  setUploadingOptionIndex(i);
+                                  try {
+                                    const url = await processImageBlob(file);
+                                    const m2 = draft as MultipleChoiceQuestion;
+                                    const next = [...(m2.option_image_urls ?? [])];
                                     while (next.length <= i) next.push(undefined);
-                                    next[i] = undefined;
+                                    next[i] = url;
                                     setDraft({
                                       ...draft,
                                       option_image_urls: next,
                                     } as MultipleChoiceQuestion);
-                                  }}
-                                  className="text-sm text-red-600 hover:underline"
-                                >
-                                  Видалити фото
-                                </button>
-                              </div>
-                            ) : (
-                              <div>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  disabled={uploadingOptionIndex !== null}
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-                                    setImageError(null);
-                                    setUploadingOptionIndex(i);
-                                    try {
-                                      const url = await uploadQuestionImage(file);
-                                      const m2 = draft as MultipleChoiceQuestion;
-                                      const next = [...(m2.option_image_urls ?? [])];
-                                      while (next.length <= i) next.push(undefined);
-                                      next[i] = url;
-                                      setDraft({
-                                        ...draft,
-                                        option_image_urls: next,
-                                      } as MultipleChoiceQuestion);
-                                    } catch (err) {
-                                      setImageError(err instanceof Error ? err.message : "Помилка завантаження");
-                                    } finally {
-                                      setUploadingOptionIndex(null);
-                                      e.target.value = "";
+                                  } catch (err) {
+                                    setImageError(err instanceof Error ? err.message : "Помилка завантаження");
+                                  } finally {
+                                    setUploadingOptionIndex(null);
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="block text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800"
+                              />
+                              <button
+                                type="button"
+                                disabled={uploadingOptionIndex !== null}
+                                onClick={async () => {
+                                  try {
+                                    const items = await navigator.clipboard.read();
+                                    for (const item of items) {
+                                      const blob = await getImageFromClipboardItem(item);
+                                      if (blob) {
+                                        setImageError(null);
+                                        setUploadingOptionIndex(i);
+                                        try {
+                                          const url = await processImageBlob(blob);
+                                          const m2 = draft as MultipleChoiceQuestion;
+                                          const next = [...(m2.option_image_urls ?? [])];
+                                          while (next.length <= i) next.push(undefined);
+                                          next[i] = url;
+                                          setDraft({
+                                            ...draft,
+                                            option_image_urls: next,
+                                          } as MultipleChoiceQuestion);
+                                        } finally {
+                                          setUploadingOptionIndex(null);
+                                        }
+                                        return;
+                                      }
                                     }
-                                  }}
-                                  className="block text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800"
-                                />
-                                {uploadingOptionIndex === i && (
-                                  <p className="text-xs text-slate-500 mt-0.5">Завантаження…</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                                    setImageError("У буфері немає зображення");
+                                  } catch (err) {
+                                    setImageError(err instanceof Error ? err.message : "Немає доступу до буфера");
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-medium hover:bg-indigo-200 disabled:opacity-70"
+                              >
+                                <ImagePlus className="w-3.5 h-3.5" />
+                                Вставити з буфера
+                              </button>
+                              {uploadingOptionIndex === i && (
+                                <p className="text-xs text-slate-500 mt-0.5">Завантаження…</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

@@ -13,9 +13,52 @@ const BASE_ID = process.env.AIRTABLE_BASE_ID;
 const API_KEY = process.env.AIRTABLE_API_KEY;
 const QUESTIONS_TABLE = process.env.AIRTABLE_QUESTIONS_TABLE || "Questions";
 const RESULTS_TABLE = process.env.AIRTABLE_RESULTS_TABLE || "Results";
+const IMAGE_STORAGE_TABLE = process.env.AIRTABLE_IMAGE_STORAGE_TABLE || "ImageStorage";
+
+/** Макс довжина base64 в Airtable Long text (~100K) */
+const MAX_IMAGE_BASE64_LENGTH = 98_000;
 
 export function isAirtableConfigured() {
   return !!(BASE_ID && API_KEY);
+}
+
+/** Зберігає зображення в Airtable (таблиця ImageStorage, поля Content + Type). Повертає record id. */
+export async function createImageRecord(contentBase64: string, mimeType: string): Promise<string> {
+  if (!isAirtableConfigured() || contentBase64.length > MAX_IMAGE_BASE64_LENGTH) {
+    throw new Error("Airtable not configured or image too large");
+  }
+  const res = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${IMAGE_STORAGE_TABLE}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fields: {
+        Content: contentBase64,
+        Type: mimeType || "image/png",
+      },
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Failed to store image");
+  return data.id;
+}
+
+/** Читає зображення з Airtable за record id */
+export async function getImageRecord(
+  id: string
+): Promise<{ content: string; mimeType: string }> {
+  if (!isAirtableConfigured()) throw new Error("Airtable not configured");
+  const res = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${IMAGE_STORAGE_TABLE}/${id}`, {
+    headers: { Authorization: `Bearer ${API_KEY}` },
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Failed to get image");
+  const content = data.fields?.Content as string | undefined;
+  const mimeType = (data.fields?.Type as string) || "image/png";
+  if (!content) throw new Error("Image not found");
+  return { content, mimeType };
 }
 
 type AirtableRecord<T> = { id: string; fields: T };
