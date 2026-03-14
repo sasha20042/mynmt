@@ -17,7 +17,7 @@ export function QuestionMultiple({ question, value, onChange }: Props) {
           <img
             src={question.image_url}
             alt="До питання"
-            className="w-full max-h-80 object-contain"
+            className="w-full max-w-full object-contain"
           />
         </div>
       )}
@@ -30,7 +30,7 @@ export function QuestionMultiple({ question, value, onChange }: Props) {
               key={i}
               className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition ${
                 value === i
-                  ? "border-primary-500 bg-primary-50"
+                  ? "border-indigo-500 bg-indigo-50"
                   : "border-slate-200 hover:border-slate-300"
               }`}
             >
@@ -39,20 +39,20 @@ export function QuestionMultiple({ question, value, onChange }: Props) {
                 name={question.id}
                 checked={value === i}
                 onChange={() => onChange(i)}
-                className="w-4 h-4 mt-0.5 shrink-0 text-primary-600"
+                className="w-4 h-4 mt-0.5 shrink-0 text-indigo-600"
               />
               <div className="min-w-0 flex-1">
                 {optImg && (
-                  <div className="mb-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 max-w-[200px]">
+                  <div className="mb-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={optImg}
                       alt=""
-                      className="w-full max-h-32 object-contain"
+                      className="w-full max-w-full object-contain"
                     />
                   </div>
                 )}
-                <span className="text-slate-800">{opt}</span>
+                <span className="text-slate-900">{opt}</span>
               </div>
             </label>
           );

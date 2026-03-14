@@ -241,7 +241,7 @@ function TestPageContent() {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="text-primary-600 hover:underline"
+            className="text-indigo-600 hover:underline"
           >
             Повернутися на головну
           </button>
@@ -270,13 +270,23 @@ function TestPageContent() {
             </span>
             <span className="text-slate-500 text-sm">{gradeLabels[grade]}</span>
           </div>
-          <div
-            className={`flex items-center gap-2 ${
-              secondsLeft <= 300 ? "text-red-600" : "text-slate-600"
-            }`}
-          >
-            <Clock className="w-5 h-5" />
-            <span className="font-mono font-medium">{formatTime(secondsLeft)}</span>
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-2 ${
+                secondsLeft <= 300 ? "text-red-600" : "text-slate-600"
+              }`}
+            >
+              <Clock className="w-5 h-5" />
+              <span className="font-mono font-medium">{formatTime(secondsLeft)}</span>
+            </div>
+            <button
+              type="button"
+              onClick={finishBlock}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+            >
+              <Send className="w-4 h-4" />
+              {block === 1 ? "Здати блок 1" : "Здати тест"}
+            </button>
           </div>
         </div>
       </header>
@@ -284,7 +294,7 @@ function TestPageContent() {
       <div className="flex-1 flex max-w-5xl w-full mx-auto gap-6 p-4">
         <aside className="w-44 shrink-0 hidden sm:block">
           <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-medium text-slate-500 mb-3">Питання</p>
+            <p className="text-xs font-medium text-slate-700 mb-3">Питання</p>
             <div className="flex flex-wrap gap-2">
               {questionList.map((q, i) => (
                 <button
@@ -293,17 +303,17 @@ function TestPageContent() {
                   onClick={() => setCurrentIndex(i)}
                   className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition ${
                     currentIndex === i
-                      ? "bg-primary-600 text-white"
+                      ? "bg-indigo-600 text-white"
                       : answers[q.id] !== undefined
-                        ? "bg-primary-100 text-primary-700"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
+                        : "bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300"
                   }`}
                 >
                   {i + 1}
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-slate-600">
               Відповідно: {answeredCount} / {questionList.length}
             </p>
           </div>
@@ -312,13 +322,13 @@ function TestPageContent() {
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8">
             {currentSubject && (
-              <p className="text-xs text-primary-600 font-medium mb-1">
+              <p className="text-xs text-indigo-700 font-medium mb-1">
                 {subjectLabels[currentSubject]}
               </p>
             )}
             {currentQuestion && (
               <>
-                <p className="text-sm text-slate-500 mb-2">
+                <p className="text-sm font-medium text-slate-700 mb-2">
                   Питання {currentIndex + 1} з {questionList.length}
                 </p>
                 {currentQuestion.type === "multiple" && (
@@ -352,7 +362,7 @@ function TestPageContent() {
                 <button
                   type="button"
                   onClick={() => setCurrentIndex((i) => i + 1)}
-                  className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 font-medium border border-slate-300"
                 >
                   Далі
                   <ChevronRight className="w-5 h-5" />
@@ -361,7 +371,7 @@ function TestPageContent() {
                 <button
                   type="button"
                   onClick={finishBlock}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium border border-indigo-700"
                 >
                   <Send className="w-4 h-4" />
                   {block === 1 ? "Завершити блок і перейти до блоку 2" : "Завершити тест"}
@@ -376,8 +386,10 @@ function TestPageContent() {
                 key={q.id}
                 type="button"
                 onClick={() => setCurrentIndex(i)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${
-                  currentIndex === i ? "bg-primary-600 text-white" : "bg-slate-200"
+                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium border ${
+                  currentIndex === i
+                    ? "bg-indigo-600 text-white border-indigo-700"
+                    : "bg-slate-200 text-slate-800 border-slate-300"
                 }`}
               >
                 {i + 1}

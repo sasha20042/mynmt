@@ -56,7 +56,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white">
+          <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
             <GraduationCap className="w-6 h-6" />
           </div>
           <div>
@@ -89,7 +89,7 @@ export default function WelcomePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Наприклад: Петренко Олексій Іванович"
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition"
+                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
               />
             </div>
 
@@ -104,7 +104,7 @@ export default function WelcomePage() {
                   value={invitation}
                   onChange={(e) => setInvitation(e.target.value)}
                   placeholder="Введіть номер з запрошення"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
                 />
               </div>
             </div>
@@ -118,7 +118,7 @@ export default function WelcomePage() {
                 onChange={(e) =>
                   setGrade((e.target.value ? Number(e.target.value) : "") as Grade | "")
                 }
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition bg-white"
               >
                 <option value="">Оберіть клас</option>
                 {grades.map((g) => (
@@ -157,11 +157,11 @@ export default function WelcomePage() {
         </div>
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          <a href="/admin-results" className="text-primary-600 hover:underline">
+          <a href="/admin-results" className="text-indigo-600 hover:underline">
             Результати
           </a>
           {" · "}
-          <a href="/admin" className="text-primary-600 hover:underline">
+          <a href="/admin" className="text-indigo-600 hover:underline">
             Адмін: внесення тестів
           </a>
         </p>

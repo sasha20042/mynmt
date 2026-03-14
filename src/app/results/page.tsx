@@ -90,8 +90,8 @@ export default function ResultsPage() {
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-              <Award className="w-8 h-8 text-primary-600" />
+            <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center">
+              <Award className="w-8 h-8 text-indigo-600" />
             </div>
           </div>
           <h1 className="text-xl font-semibold text-slate-800 text-center mb-2">
@@ -117,7 +117,7 @@ export default function ResultsPage() {
                     </p>
                   </div>
                 </div>
-                <span className="text-xl font-bold text-primary-600">{s.score}%</span>
+                <span className="text-xl font-bold text-indigo-700">{s.score}%</span>
               </div>
             ))}
           </div>
@@ -125,7 +125,7 @@ export default function ResultsPage() {
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-medium flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2"
           >
             <Home className="w-5 h-5" />
             На головну

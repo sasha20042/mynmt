@@ -26,7 +26,7 @@ export function QuestionMatching({ question, value, onChange }: Props) {
           <img
             src={question.image_url}
             alt="До питання"
-            className="w-full max-h-80 object-contain"
+            className="w-full max-w-full object-contain"
           />
         </div>
       )}

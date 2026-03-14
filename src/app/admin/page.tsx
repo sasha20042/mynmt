@@ -178,7 +178,7 @@ export default function AdminTestsPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
@@ -192,7 +192,7 @@ export default function AdminTestsPage() {
           </div>
           <Link
             href="/admin-results"
-            className="text-sm text-primary-600 hover:underline"
+            className="text-sm text-indigo-600 hover:underline"
           >
             Результати →
           </Link>
@@ -299,7 +299,7 @@ export default function AdminTestsPage() {
                   <button
                     type="button"
                     onClick={() => handleEdit(i)}
-                    className="p-2 rounded-lg text-slate-500 hover:bg-primary-50 hover:text-primary-600"
+                    className="p-2 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"
                     aria-label="Редагувати"
                   >
                     <Pencil className="w-4 h-4" />
@@ -351,7 +351,7 @@ export default function AdminTestsPage() {
                     setDraft({ ...draft, question: e.target.value })
                   }
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   placeholder="Введіть текст питання..."
                 />
                 <div className="mt-3 flex items-center gap-3">
@@ -368,7 +368,7 @@ export default function AdminTestsPage() {
                       const w = Number.isFinite(raw) && raw > 0 ? raw : 1;
                       setDraft({ ...(draft as Question & { weight?: number }), weight: w });
                     }}
-                    className="w-24 px-3 py-1.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm"
+                    className="w-24 px-3 py-1.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm"
                   />
                   <span className="text-xs text-slate-500">
                     Скільки балів дає правильна відповідь (за замовчуванням 1).
@@ -722,7 +722,7 @@ export default function AdminTestsPage() {
                         pairs: [...(draft as MatchingQuestion).pairs, { left: "", right: "" }],
                       } as MatchingQuestion);
                     }}
-                    className="text-sm text-primary-600 hover:underline mt-1"
+                    className="text-sm text-indigo-600 hover:underline mt-1"
                   >
                     + Додати пару
                   </button>
