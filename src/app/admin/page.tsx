@@ -325,7 +325,7 @@ export default function AdminTestsPage() {
                     type="number"
                     min={0.25}
                     step={0.25}
-                    value={("weight" in draft && (draft as Question & { weight?: number }).weight) ?? 1}
+                    value={Math.max(0.25, (draft as Question & { weight?: number }).weight ?? 1)}
                     onChange={(e) => {
                       const raw = parseFloat(e.target.value.replace(",", "."));
                       const w = Number.isFinite(raw) && raw > 0 ? raw : 1;
