@@ -113,14 +113,7 @@ export default function ResultsPage() {
                     <p className="font-medium text-slate-800">{s.label}</p>
                     <p className="text-sm text-slate-500">
                       <CheckCircle className="w-4 h-4 text-emerald-500 inline mr-1" />
-                      {s.correct} правильних
-                      {s.total > 0 && (
-                        <>
-                          {" · "}
-                          <XCircle className="w-4 h-4 text-red-500 inline mr-1" />
-                          {s.total - s.correct} неправильних
-                        </>
-                      )}
+                      Набрано {s.correct} з {s.total} балів
                     </p>
                   </div>
                 </div>

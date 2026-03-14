@@ -14,6 +14,7 @@ function rowToQuestion(row: {
   pairs: { left: string; right: string }[] | null;
   image_url: string | null;
   option_image_urls?: (string | null)[] | null;
+  weight?: number | null;
 }): Question {
   if (row.type === "multiple") {
     const q: MultipleChoiceQuestion = {
@@ -27,15 +28,22 @@ function rowToQuestion(row: {
     if (Array.isArray(row.option_image_urls)) {
       q.option_image_urls = row.option_image_urls.map((u) => u || undefined);
     }
+    if (typeof row.weight === "number" && !Number.isNaN(row.weight)) {
+      q.weight = row.weight;
+    }
     return q;
   }
-  return {
+  const q: MatchingQuestion = {
     type: "matching",
     id: row.id,
     question: row.question,
     pairs: row.pairs || [],
-    ...(row.image_url && { image_url: row.image_url }),
-  } as MatchingQuestion;
+  };
+  if (row.image_url) q.image_url = row.image_url;
+  if (typeof row.weight === "number" && !Number.isNaN(row.weight)) {
+    q.weight = row.weight;
+  }
+  return q;
 }
 
 function questionToRow(q: Question, grade: Grade, subject: SubjectId, sortOrder: number) {
@@ -46,6 +54,7 @@ function questionToRow(q: Question, grade: Grade, subject: SubjectId, sortOrder:
     type: q.type,
     question: q.question,
     image_url: (q as Question & { image_url?: string }).image_url ?? null,
+    weight: (q as Question & { weight?: number }).weight ?? 1,
   };
   if (q.type === "multiple") {
     const m = q as MultipleChoiceQuestion;

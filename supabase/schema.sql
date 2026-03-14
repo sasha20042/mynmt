@@ -11,7 +11,8 @@ create table if not exists questions (
   options jsonb,
   correct_index int,
   pairs jsonb,
-  image_url text
+  image_url text,
+  weight numeric not null default 1
 );
 
 create index if not exists idx_questions_grade_subject on questions (grade, subject);
@@ -39,6 +40,9 @@ alter table results enable row level security;
 
 create policy "Allow all for questions" on questions for all using (true) with check (true);
 create policy "Allow all for results" on results for all using (true) with check (true);
+
+-- Якщо таблиця questions вже існувала без weight, виконай:
+-- alter table questions add column if not exists weight numeric not null default 1;
 
 -- Storage: створи бакет вручну в Dashboard → Storage → New bucket
 -- Назва: question-images, Public bucket: так (щоб посилання на фото відкривалися)

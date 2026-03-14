@@ -19,6 +19,8 @@ export interface MultipleChoiceQuestion {
   question: string;
   options: string[];
   correctIndex: number;
+  /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
+  weight?: number;
   /** URL фото до питання (Supabase Storage або зовнішнє) */
   image_url?: string;
   /** URL фото до варіантів відповіді (індекс = options), опційно для кожного варіанту */
@@ -37,6 +39,8 @@ export interface MatchingQuestion {
   pairs: MatchingPair[];
   /** URL фото до питання (Supabase Storage або зовнішнє) */
   image_url?: string;
+  /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
+  weight?: number;
 }
 
 export type Question = MultipleChoiceQuestion | MatchingQuestion;

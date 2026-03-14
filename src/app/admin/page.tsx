@@ -29,6 +29,7 @@ const newMultiple = (): MultipleChoiceQuestion => ({
   question: "",
   options: ["", "", "", ""],
   correctIndex: 0,
+  weight: 1,
 });
 
 const newMatching = (): MatchingQuestion => ({
@@ -36,6 +37,7 @@ const newMatching = (): MatchingQuestion => ({
   id: generateId(),
   question: "",
   pairs: [{ left: "", right: "" }],
+  weight: 1,
 });
 
 export default function AdminTestsPage() {
@@ -315,6 +317,26 @@ export default function AdminTestsPage() {
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                   placeholder="Введіть текст питання..."
                 />
+                <div className="mt-3 flex items-center gap-3">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Вага питання (бали)
+                  </label>
+                  <input
+                    type="number"
+                    min={0.25}
+                    step={0.25}
+                    value={("weight" in draft && (draft as Question & { weight?: number }).weight) ?? 1}
+                    onChange={(e) => {
+                      const raw = parseFloat(e.target.value.replace(",", "."));
+                      const w = Number.isFinite(raw) && raw > 0 ? raw : 1;
+                      setDraft({ ...(draft as Question & { weight?: number }), weight: w });
+                    }}
+                    className="w-24 px-3 py-1.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm"
+                  />
+                  <span className="text-xs text-slate-500">
+                    Скільки балів дає правильна відповідь (за замовчуванням 1).
+                  </span>
+                </div>
               </div>
               {isSupabaseConfigured() && (
                 <div>

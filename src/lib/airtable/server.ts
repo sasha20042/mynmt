@@ -32,6 +32,7 @@ interface AirtableQuestionFields {
   Image?: { url: string }[];
   /** JSON array of image URLs for options (same order as Options) */
   OptionImages?: string;
+  Weight?: number;
 }
 
 function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Question {
@@ -47,6 +48,9 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
       correctIndex: f.CorrectIndex ?? 0,
     };
     if (imageUrl) q.image_url = imageUrl;
+    if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
+      q.weight = f.Weight;
+    }
     if (f.OptionImages) {
       try {
         const arr = JSON.parse(f.OptionImages) as (string | null | undefined)[];
@@ -64,6 +68,9 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
     pairs: f.Pairs ? JSON.parse(f.Pairs) : [],
   };
   if (imageUrl) q.image_url = imageUrl;
+  if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
+    q.weight = f.Weight;
+  }
   return q;
 }
 
@@ -126,11 +133,13 @@ function questionToFields(
     if (m.option_image_urls?.length) {
       fields.OptionImages = JSON.stringify(m.option_image_urls);
     }
+    fields.Weight = (m as MultipleChoiceQuestion & { weight?: number }).weight ?? 1;
   } else {
     const mat = q as MatchingQuestion;
     fields.Options = null;
     fields.CorrectIndex = null;
     fields.Pairs = JSON.stringify(mat.pairs);
+    fields.Weight = (mat as MatchingQuestion & { weight?: number }).weight ?? 1;
   }
   const imgUrl = (q as Question & { image_url?: string }).image_url;
   if (imgUrl) fields.Image = [{ url: imgUrl }];

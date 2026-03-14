@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
 import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
-import type { Grade, SubjectId, AnswerState, AnswerDetailItem } from "@/types";
+import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
 
@@ -19,14 +19,20 @@ function parseParams(searchParams: ReturnType<typeof useSearchParams>) {
   return { name, invitation, grade, block };
 }
 
+function getWeight(q: Question): number {
+  const w = (q as Question & { weight?: number }).weight;
+  return typeof w === "number" && w > 0 ? w : 1;
+}
+
 function computeSubjectScores(
-  blockItems: { subject: SubjectId; question: import("@/types").Question }[],
+  blockItems: { subject: SubjectId; question: Question }[],
   answers: Record<string, AnswerState["value"]>
 ): Record<SubjectId, { correct: number; total: number }> {
   const out: Record<string, { correct: number; total: number }> = {};
   for (const { subject, question: q } of blockItems) {
     if (!out[subject]) out[subject] = { correct: 0, total: 0 };
-    out[subject].total += 1;
+    const w = getWeight(q as Question);
+    out[subject].total += w;
     const val = answers[q.id];
     let ok = false;
     if (q.type === "multiple" && typeof val === "number") {
@@ -34,13 +40,13 @@ function computeSubjectScores(
     } else if (q.type === "matching" && Array.isArray(val)) {
       ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
     }
-    if (ok) out[subject].correct += 1;
+    if (ok) out[subject].correct += w;
   }
   return out as Record<SubjectId, { correct: number; total: number }>;
 }
 
 function computeAnswerDetails(
-  blockItems: { subject: SubjectId; question: import("@/types").Question }[],
+  blockItems: { subject: SubjectId; question: Question }[],
   answers: Record<string, AnswerState["value"]>
 ): Record<SubjectId, AnswerDetailItem[]> {
   const out: Record<string, AnswerDetailItem[]> = {};
