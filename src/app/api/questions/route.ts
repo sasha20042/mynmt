@@ -33,6 +33,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Failed to save questions" }, { status: 500 });
+    const message = e instanceof Error ? e.message : "Failed to save questions";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
