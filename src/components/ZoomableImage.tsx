@@ -23,14 +23,16 @@ export function ZoomableImage({
 
   return (
     <>
-      <div className={`relative inline-block ${containerClassName}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className={className}
-          style={style}
-        />
+      <div className={`inline-flex items-start gap-2 ${containerClassName}`}>
+        <div className="min-w-0 flex-shrink">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt}
+            className={className}
+            style={style}
+          />
+        </div>
         <button
           type="button"
           onClick={(e) => {
@@ -38,7 +40,7 @@ export function ZoomableImage({
             e.stopPropagation();
             setOpen(true);
           }}
-          className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-white/90 hover:bg-white border border-slate-200 shadow-sm text-slate-600 hover:text-indigo-600 transition"
+          className="flex-shrink-0 p-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 shadow-sm text-slate-600 hover:text-indigo-600 transition mt-0.5"
           aria-label="Збільшити зображення"
         >
           <Search className="w-4 h-4" />
