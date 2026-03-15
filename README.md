@@ -30,7 +30,7 @@ npm run dev
    - `NEXT_PUBLIC_USE_AIRTABLE=true`
 
 2. Таблиці в базі:
-   - **Questions** — Grade, Subject, SortOrder, **Type** (Single select: Multiple, Matching, short_answer), Question, Options, CorrectIndex, Pairs (JSON: масив `[{ left, right, leftImageUrl?, rightImageUrl? }]` для типу Відповідність), **CorrectAnswer**, Image, OptionImages, **ImageScale** (число, масштаб зображення в тесті: 1 = 100%), Weight. (Назву таблиці можна змінити через `AIRTABLE_QUESTIONS_TABLE` у .env.)
+   - **Questions** — Grade, Subject, SortOrder, **Type** (Single select: Multiple, **multiple_correct**, Matching, short_answer), Question, Options, CorrectIndex, **CorrectIndices** (JSON-масив індексів для типу «Декілька правильних», напр. `[0,2,4]`), Pairs, CorrectAnswer, Image, OptionImages, ImageScale, Weight. (Назву таблиці можна змінити через `AIRTABLE_QUESTIONS_TABLE` у .env.)
    - **Results** — Name, Invitation, Grade, Date, Subjects, AnswerDetails.
    - **ImageStorage** — для фото питань/відповідей: поля **Content** (Long text, base64) та **Type** (Single line text, напр. `image/png`). Макс. розмір зображення ~70 КБ.
 

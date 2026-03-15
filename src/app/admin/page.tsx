@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getQuestionBank, saveQuestionsForSubject } from "@/lib/questionsStorage";
 import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/questions";
-import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion, ShortAnswerQuestion } from "@/types";
+import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { generateId } from "@/lib/uuid";
 
 type EditMode = { type: "add" } | { type: "edit"; index: number };
@@ -68,6 +68,15 @@ const newShortAnswer = (): ShortAnswerQuestion => ({
   id: generateId(),
   question: "",
   correctAnswer: "",
+  weight: 1,
+});
+
+const newMultipleCorrect = (): MultipleCorrectQuestion => ({
+  type: "multiple_correct",
+  id: generateId(),
+  question: "",
+  options: ["", "", "", ""],
+  correctIndices: [],
   weight: 1,
 });
 
@@ -136,6 +145,16 @@ export default function AdminTestsPage() {
       const m = draft as MultipleChoiceQuestion;
       if (!m.question.trim() || m.options.some((o) => !o.trim())) {
         alert("Заповніть питання та усі варіанти відповіді.");
+        return;
+      }
+    } else if (draft.type === "multiple_correct") {
+      const m = draft as MultipleCorrectQuestion;
+      if (!m.question.trim() || m.options.some((o) => !o.trim())) {
+        alert("Заповніть питання та усі варіанти відповіді.");
+        return;
+      }
+      if (m.correctIndices.length === 0) {
+        alert("Оберіть хоча б одну правильну відповідь.");
         return;
       }
     } else if (draft.type === "short_answer") {
@@ -307,9 +326,11 @@ export default function AdminTestsPage() {
                   <p className="text-xs text-slate-500 mt-0.5">
                     {q.type === "multiple"
                       ? "Один з варіантів"
-                      : q.type === "short_answer"
-                        ? "Своя відповідь"
-                        : "Відповідність"}
+                      : q.type === "multiple_correct"
+                        ? "Декілька правильних"
+                        : q.type === "short_answer"
+                          ? "Своя відповідь"
+                          : "Відповідність"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -350,12 +371,16 @@ export default function AdminTestsPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     setDraft(
-                      v === "multiple" ? newMultiple() : v === "short_answer" ? newShortAnswer() : newMatching()
+                      v === "multiple" ? newMultiple()
+                      : v === "short_answer" ? newShortAnswer()
+                      : v === "multiple_correct" ? newMultipleCorrect()
+                      : newMatching()
                     );
                   }}
                   className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xs"
                 >
                   <option value="multiple">Один з варіантів (до 10)</option>
+                  <option value="multiple_correct">Декілька правильних відповідей</option>
                   <option value="matching">Відповідність (пари)</option>
                   <option value="short_answer">Своя відповідь (число/текст)</option>
                 </select>
@@ -736,6 +761,142 @@ export default function AdminTestsPage() {
                           options: [...opts, ""],
                           option_image_urls: [...urls, undefined],
                         } as MultipleChoiceQuestion);
+                      }
+                    }}
+                    className="text-sm text-indigo-600 hover:underline mt-1"
+                  >
+                    + Додати варіант
+                  </button>
+                </div>
+              )}
+              {draft.type === "multiple_correct" && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Варіанти відповіді (позначте усі правильні, можна додати фото до варіанту)
+                  </label>
+                  {(draft as MultipleCorrectQuestion).options.map((opt, i) => {
+                    const m = draft as MultipleCorrectQuestion;
+                    const optUrls = m.option_image_urls ?? [];
+                    const optImg = optUrls[i];
+                    const isCorrect = m.correctIndices.includes(i);
+                    return (
+                      <div key={i} className="mb-4 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isCorrect}
+                            onChange={() => {
+                              const next = isCorrect
+                                ? m.correctIndices.filter((idx) => idx !== i)
+                                : [...m.correctIndices, i].sort((a, b) => a - b);
+                              setDraft({ ...draft, correctIndices: next } as MultipleCorrectQuestion);
+                            }}
+                            className="rounded text-indigo-600"
+                          />
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const opts = [...m.options];
+                              opts[i] = e.target.value;
+                              setDraft({ ...draft, options: opts } as MultipleCorrectQuestion);
+                            }}
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
+                            placeholder={`Варіант ${i + 1}`}
+                          />
+                        </div>
+                        <div className="ml-6 pl-1">
+                          {optImg ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[120px] max-h-20">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={optImg} alt="" className="w-full h-full object-contain bg-slate-50" />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...(m.option_image_urls ?? [])];
+                                  while (next.length <= i) next.push(undefined);
+                                  next[i] = undefined;
+                                  setDraft({ ...draft, option_image_urls: next } as MultipleCorrectQuestion);
+                                }}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Видалити фото
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-2 inline-block">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={uploadingOptionIndex !== null}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingOptionIndex(i);
+                                  try {
+                                    const url = await processImageBlob(file);
+                                    const m2 = draft as MultipleCorrectQuestion;
+                                    const next = [...(m2.option_image_urls ?? [])];
+                                    while (next.length <= i) next.push(undefined);
+                                    next[i] = url;
+                                    setDraft({ ...draft, option_image_urls: next } as MultipleCorrectQuestion);
+                                  } finally {
+                                    setUploadingOptionIndex(null);
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="block text-sm text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800"
+                              />
+                              <button
+                                type="button"
+                                disabled={uploadingOptionIndex !== null}
+                                onClick={async () => {
+                                  try {
+                                    const items = await navigator.clipboard.read();
+                                    for (const item of items) {
+                                      const blob = await getImageFromClipboardItem(item);
+                                      if (blob) {
+                                        setUploadingOptionIndex(i);
+                                        try {
+                                          const url = await processImageBlob(blob);
+                                          const m2 = draft as MultipleCorrectQuestion;
+                                          const next = [...(m2.option_image_urls ?? [])];
+                                          while (next.length <= i) next.push(undefined);
+                                          next[i] = url;
+                                          setDraft({ ...draft, option_image_urls: next } as MultipleCorrectQuestion);
+                                        } finally {
+                                          setUploadingOptionIndex(null);
+                                        }
+                                        return;
+                                      }
+                                    }
+                                  } catch {}
+                                }}
+                                className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-medium hover:bg-indigo-200"
+                              >
+                                <ImagePlus className="w-3.5 h-3.5" />
+                                Вставити з буфера
+                              </button>
+                              {uploadingOptionIndex === i && <span className="text-xs text-slate-500">Завантаження…</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const m = draft as MultipleCorrectQuestion;
+                      if (m.options.length < 10) {
+                        const urls = m.option_image_urls ?? [];
+                        setDraft({
+                          ...draft,
+                          options: [...m.options, ""],
+                          option_image_urls: [...urls, undefined],
+                        } as MultipleCorrectQuestion);
                       }
                     }}
                     className="text-sm text-indigo-600 hover:underline mt-1"

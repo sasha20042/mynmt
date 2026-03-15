@@ -51,6 +51,20 @@ export interface MatchingQuestion {
   image_scale?: number;
 }
 
+/** Декілька правильних відповідей: учень обирає кілька варіантів (наприклад 3 з 6) */
+export interface MultipleCorrectQuestion {
+  type: "multiple_correct";
+  id: string;
+  question: string;
+  options: string[];
+  /** Індекси правильних варіантів (наприклад [0, 2, 4]) */
+  correctIndices: number[];
+  weight?: number;
+  image_url?: string;
+  option_image_urls?: (string | undefined)[];
+  image_scale?: number;
+}
+
 /** Своя відповідь: учень вводить число або текст, порівняння з правильним варіантом */
 export interface ShortAnswerQuestion {
   type: "short_answer";
@@ -65,7 +79,7 @@ export interface ShortAnswerQuestion {
   image_scale?: number;
 }
 
-export type Question = MultipleChoiceQuestion | MatchingQuestion | ShortAnswerQuestion;
+export type Question = MultipleChoiceQuestion | MatchingQuestion | ShortAnswerQuestion | MultipleCorrectQuestion;
 
 export type QuestionBank = Record<Grade, Record<SubjectId, Question[]>>;
 
@@ -98,7 +112,7 @@ export interface TestResult {
 
 export interface AnswerState {
   questionId: string;
-  type: "multiple" | "matching" | "short_answer";
+  type: "multiple" | "matching" | "short_answer" | "multiple_correct";
   value: number | number[] | string;
   correct: boolean;
 }

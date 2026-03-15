@@ -6,6 +6,7 @@ import type {
   MultipleChoiceQuestion,
   MatchingQuestion,
   ShortAnswerQuestion,
+  MultipleCorrectQuestion,
   TestResult,
 } from "@/types";
 import { grades, subjectIds } from "@/constants/questions";
@@ -72,6 +73,8 @@ interface AirtableQuestionFields {
   Question?: string;
   Options?: string;
   CorrectIndex?: number;
+  /** Для типу multiple_correct — масив індексів правильних варіантів (JSON) */
+  CorrectIndices?: string;
   Pairs?: string;
   /** Для типу short_answer — правильна відповідь (число або текст) */
   CorrectAnswer?: string;
@@ -98,6 +101,37 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
     if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
       q.weight = f.Weight;
     }
+    if (f.OptionImages) {
+      try {
+        const arr = JSON.parse(f.OptionImages) as (string | null | undefined)[];
+        if (Array.isArray(arr)) q.option_image_urls = arr.map((u) => u || undefined);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (typeof f.ImageScale === "number" && f.ImageScale > 0) q.image_scale = f.ImageScale;
+    return q;
+  }
+  if (f.Type === "multiple_correct") {
+    const options = f.Options ? JSON.parse(f.Options) : [];
+    let correctIndices: number[] = [];
+    if (f.CorrectIndices) {
+      try {
+        const arr = JSON.parse(f.CorrectIndices) as number[];
+        if (Array.isArray(arr)) correctIndices = arr.filter((i) => typeof i === "number" && i >= 0 && i < options.length).sort((a, b) => a - b);
+      } catch {
+        /* ignore */
+      }
+    }
+    const q: MultipleCorrectQuestion = {
+      type: "multiple_correct",
+      id: record.id,
+      question: f.Question || "",
+      options,
+      correctIndices,
+    };
+    if (imageUrl) q.image_url = imageUrl;
+    if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) q.weight = f.Weight;
     if (f.OptionImages) {
       try {
         const arr = JSON.parse(f.OptionImages) as (string | null | undefined)[];
@@ -201,16 +235,29 @@ function questionToFields(
     const m = q as MultipleChoiceQuestion;
     fields.Options = JSON.stringify(m.options);
     fields.CorrectIndex = m.correctIndex;
+    fields.CorrectIndices = null;
     fields.Pairs = null;
     fields.CorrectAnswer = null;
     if (m.option_image_urls?.length) {
       fields.OptionImages = JSON.stringify(m.option_image_urls);
     }
     fields.Weight = (m as MultipleChoiceQuestion & { weight?: number }).weight ?? 1;
+  } else if (q.type === "multiple_correct") {
+    const m = q as MultipleCorrectQuestion;
+    fields.Options = JSON.stringify(m.options);
+    fields.CorrectIndex = null;
+    fields.CorrectIndices = JSON.stringify(m.correctIndices.slice().sort((a, b) => a - b));
+    fields.Pairs = null;
+    fields.CorrectAnswer = null;
+    if (m.option_image_urls?.length) {
+      fields.OptionImages = JSON.stringify(m.option_image_urls);
+    }
+    fields.Weight = m.weight ?? 1;
   } else if (q.type === "short_answer") {
     const s = q as ShortAnswerQuestion;
     fields.Options = null;
     fields.CorrectIndex = null;
+    fields.CorrectIndices = null;
     fields.Pairs = null;
     fields.CorrectAnswer = s.correctAnswer;
     fields.Weight = s.weight ?? 1;
@@ -218,6 +265,7 @@ function questionToFields(
     const mat = q as MatchingQuestion;
     fields.Options = null;
     fields.CorrectIndex = null;
+    fields.CorrectIndices = null;
     fields.Pairs = JSON.stringify(mat.pairs);
     fields.CorrectAnswer = null;
     fields.Weight = (mat as MatchingQuestion & { weight?: number }).weight ?? 1;

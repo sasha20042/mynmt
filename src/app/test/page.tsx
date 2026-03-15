@@ -5,10 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
 import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
-import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion } from "@/types";
+import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
 import { QuestionShortAnswer } from "@/components/QuestionShortAnswer";
+import { QuestionMultipleCorrect } from "@/components/QuestionMultipleCorrect";
 
 const BLOCK1_STORAGE = "nmt_block1_scores";
 
@@ -54,6 +55,10 @@ function computeSubjectScores(
       ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
     } else if (q.type === "short_answer" && typeof val === "string") {
       ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
+    } else if (q.type === "multiple_correct" && Array.isArray(val)) {
+      const correct = (q as MultipleCorrectQuestion).correctIndices.slice().sort((a, b) => a - b);
+      const user = (val as number[]).slice().sort((a, b) => a - b);
+      ok = correct.length === user.length && correct.every((c, i) => c === user[i]);
     }
     if (ok) out[subject].correct += w;
   }
@@ -75,6 +80,10 @@ function computeAnswerDetails(
       ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
     } else if (q.type === "short_answer" && typeof val === "string") {
       ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
+    } else if (q.type === "multiple_correct" && Array.isArray(val)) {
+      const correct = (q as MultipleCorrectQuestion).correctIndices.slice().sort((a, b) => a - b);
+      const user = (val as number[]).slice().sort((a, b) => a - b);
+      ok = correct.length === user.length && correct.every((c, i) => c === user[i]);
     }
     const snippet = q.question.trim().slice(0, 100);
     out[subject].push({
@@ -366,6 +375,13 @@ function TestPageContent() {
                   <QuestionShortAnswer
                     question={currentQuestion as ShortAnswerQuestion}
                     value={answers[currentQuestion.id] as string | undefined}
+                    onChange={(v) => setAnswer(currentQuestion.id, v)}
+                  />
+                )}
+                {currentQuestion.type === "multiple_correct" && (
+                  <QuestionMultipleCorrect
+                    question={currentQuestion as MultipleCorrectQuestion}
+                    value={answers[currentQuestion.id] as number[] | undefined}
                     onChange={(v) => setAnswer(currentQuestion.id, v)}
                   />
                 )}
