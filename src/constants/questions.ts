@@ -24,5 +24,8 @@ export const blockSubjects: Record<1 | 2, SubjectId[]> = {
   2: ["history", "english"],
 };
 
-/** 1 година на блок (у межах блоку час розподіляється між предметами) */
-export const TIME_PER_BLOCK_SEC = 60 * 60;
+/** 2 години на один блок */
+export const TIME_PER_BLOCK_SEC = 2 * 60 * 60;
+
+/** 20 хвилин перерва між блоком 1 і блоком 2 */
+export const BREAK_DURATION_SEC = 20 * 60;

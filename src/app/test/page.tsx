@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
-import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
+import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, BREAK_DURATION_SEC, blockSubjects } from "@/constants/questions";
 import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
@@ -12,6 +12,7 @@ import { QuestionShortAnswer } from "@/components/QuestionShortAnswer";
 import { QuestionMultipleCorrect } from "@/components/QuestionMultipleCorrect";
 
 const BLOCK1_STORAGE = "nmt_block1_scores";
+const BREAK_END_KEY = "nmt_break_end_ts";
 
 function parseParams(searchParams: ReturnType<typeof useSearchParams>) {
   const name = searchParams.get("name") ?? "";
@@ -45,22 +46,32 @@ function computeSubjectScores(
   const out: Record<string, { correct: number; total: number }> = {};
   for (const { subject, question: q } of blockItems) {
     if (!out[subject]) out[subject] = { correct: 0, total: 0 };
-    const w = getWeight(q as Question);
-    out[subject].total += w;
     const val = answers[q.id];
-    let ok = false;
-    if (q.type === "multiple" && typeof val === "number") {
-      ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
-    } else if (q.type === "matching" && Array.isArray(val)) {
-      ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
-    } else if (q.type === "short_answer" && typeof val === "string") {
-      ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
+    if (q.type === "matching" && Array.isArray(val)) {
+      const mat = q as import("@/types").MatchingQuestion;
+      const n = mat.pairs.length;
+      out[subject].total += n;
+      let correctPairs = 0;
+      for (let i = 0; i < n; i++) if (val[i] === i) correctPairs++;
+      out[subject].correct += correctPairs;
     } else if (q.type === "multiple_correct" && Array.isArray(val)) {
-      const correct = (q as MultipleCorrectQuestion).correctIndices.slice().sort((a, b) => a - b);
-      const user = (val as number[]).slice().sort((a, b) => a - b);
-      ok = correct.length === user.length && correct.every((c, i) => c === user[i]);
+      const mc = q as MultipleCorrectQuestion;
+      const correctSet = new Set(mc.correctIndices);
+      out[subject].total += correctSet.size;
+      let correctCount = 0;
+      for (const i of val as number[]) if (correctSet.has(i)) correctCount++;
+      out[subject].correct += correctCount;
+    } else {
+      const w = getWeight(q as Question);
+      out[subject].total += w;
+      let ok = false;
+      if (q.type === "multiple" && typeof val === "number") {
+        ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
+      } else if (q.type === "short_answer" && typeof val === "string") {
+        ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
+      }
+      if (ok) out[subject].correct += w;
     }
-    if (ok) out[subject].correct += w;
   }
   return out as Record<SubjectId, { correct: number; total: number }>;
 }
@@ -77,13 +88,15 @@ function computeAnswerDetails(
     if (q.type === "multiple" && typeof val === "number") {
       ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
     } else if (q.type === "matching" && Array.isArray(val)) {
-      ok = (q as import("@/types").MatchingQuestion).pairs.every((_, i) => val[i] === i);
+      const mat = q as import("@/types").MatchingQuestion;
+      ok = mat.pairs.every((_, i) => val[i] === i);
     } else if (q.type === "short_answer" && typeof val === "string") {
       ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
     } else if (q.type === "multiple_correct" && Array.isArray(val)) {
-      const correct = (q as MultipleCorrectQuestion).correctIndices.slice().sort((a, b) => a - b);
-      const user = (val as number[]).slice().sort((a, b) => a - b);
-      ok = correct.length === user.length && correct.every((c, i) => c === user[i]);
+      const mc = q as MultipleCorrectQuestion;
+      const correctSet = new Set(mc.correctIndices);
+      const userArr = val as number[];
+      ok = correctSet.size === userArr.length && userArr.every((i) => correctSet.has(i));
     }
     const snippet = q.question.trim().slice(0, 100);
     out[subject].push({
@@ -148,21 +161,60 @@ function TestPageContent() {
   const [answers, setAnswers] = useState<Record<string, AnswerState["value"]>>({});
   const [secondsLeft, setSecondsLeft] = useState(TIME_PER_BLOCK_SEC);
   const [ended, setEnded] = useState(false);
+  const [timeUpModalOpen, setTimeUpModalOpen] = useState(false);
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState<number | null | undefined>(block === 2 ? undefined : null);
 
   useEffect(() => {
-    if (ended) return;
+    if (block !== 2) {
+      setBreakSecondsLeft(null);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const raw = sessionStorage.getItem(BREAK_END_KEY);
+    if (raw) {
+      const endTs = parseInt(raw, 10);
+      if (!Number.isNaN(endTs) && Date.now() < endTs) {
+        setBreakSecondsLeft(Math.max(0, Math.ceil((endTs - Date.now()) / 1000)));
+      } else {
+        sessionStorage.removeItem(BREAK_END_KEY);
+        setBreakSecondsLeft(null);
+      }
+    } else {
+      setBreakSecondsLeft(null);
+    }
+  }, [block]);
+
+  useEffect(() => {
+    if (breakSecondsLeft === null || breakSecondsLeft === undefined || breakSecondsLeft <= 0) return;
+    const t = setInterval(() => {
+      setBreakSecondsLeft((s) => {
+        if (s == null || s === undefined || s <= 1) {
+          if (typeof window !== "undefined") sessionStorage.removeItem(BREAK_END_KEY);
+          return null;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [breakSecondsLeft]);
+
+  const inBreak = block === 2 && typeof breakSecondsLeft === "number" && breakSecondsLeft > 0;
+  const breakNotChecked = block === 2 && breakSecondsLeft === undefined;
+
+  useEffect(() => {
+    if (ended || timeUpModalOpen) return;
     const t = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(t);
-          setEnded(true);
+          setTimeUpModalOpen(true);
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [ended]);
+  }, [ended, timeUpModalOpen]);
 
   const setAnswer = useCallback((questionId: string, value: AnswerState["value"]) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -183,6 +235,8 @@ function TestPageContent() {
 
     if (block === 1) {
       if (typeof window !== "undefined") {
+        const breakEndTime = Date.now() + BREAK_DURATION_SEC * 1000;
+        sessionStorage.setItem(BREAK_END_KEY, String(breakEndTime));
         sessionStorage.setItem(
           BLOCK1_STORAGE,
           JSON.stringify({ subjectScores, answerDetails: blockDetails })
@@ -250,13 +304,34 @@ function TestPageContent() {
     finishBlock();
   }, [ended, finishBlock]);
 
-  if (loading) {
+  if (loading || breakNotChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <p className="text-slate-600">Завантаження…</p>
       </div>
     );
   }
+
+  if (inBreak) {
+    const breakM = Math.floor((breakSecondsLeft ?? 0) / 60);
+    const breakS = (breakSecondsLeft ?? 0) % 60;
+    const breakTimeStr = `${breakM}:${breakS.toString().padStart(2, "0")}`;
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
+          <h2 className="text-xl font-semibold text-slate-800 mb-2">Перерва</h2>
+          <p className="text-slate-600 mb-6">
+            Під час перерви проходити тестування та здавати тести не можна. До початку блоку 2 залишилось:
+          </p>
+          <p className="font-mono text-3xl font-bold text-indigo-600 mb-6">{breakTimeStr}</p>
+          <p className="text-sm text-slate-500">
+            Після закінчення перерви сторінка оновиться автоматично. Можна залишити її відкритою.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (questionList.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -277,8 +352,12 @@ function TestPageContent() {
   }
 
   const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+    }
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
@@ -438,6 +517,26 @@ function TestPageContent() {
           </div>
         </div>
       </div>
+
+      {timeUpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <p className="text-lg font-medium text-slate-800 mb-4">
+              Час закінчився. Поточні відповіді зараховано.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setTimeUpModalOpen(false);
+                finishBlock();
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
