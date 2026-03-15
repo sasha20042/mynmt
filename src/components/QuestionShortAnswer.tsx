@@ -8,16 +8,20 @@ interface Props {
   onChange: (value: string) => void;
 }
 
+const scalePct = (scale: number | undefined) => `${((scale ?? 1) * 100).toFixed(0)}%`;
+
 export function QuestionShortAnswer({ question, value, onChange }: Props) {
+  const scale = question.image_scale ?? 1;
   return (
     <div>
       {question.image_url && (
-        <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+        <div className="mb-4 rounded-xl overflow-x-auto border border-slate-200 bg-slate-50 max-w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={question.image_url}
             alt="До питання"
-            className="w-full max-w-full object-contain"
+            style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
+            className="object-contain"
           />
         </div>
       )}

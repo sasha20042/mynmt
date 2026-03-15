@@ -1,13 +1,13 @@
 # НМТ — Пробне тестування
 
-Веб-застосунок для пробного проходження Національного мультипредметного тесту (НМТ). Підтримка **Supabase** (тести, результати, фото до питань) та деплой на **Render**.
+Веб-застосунок для пробного проходження Національного мультипредметного тесту (НМТ). Питання, результати та фото — **Airtable** або localStorage.
 
 ## Технології
 
 - **Next.js** (App Router)
 - **Tailwind CSS**, **Lucide React**
-- **Supabase** — база даних (питання, результати) та Storage (фото до питань)
-- Без Supabase — дані в браузері (localStorage) для локальної розробки
+- **Airtable** — питання, результати, фото до питань (таблиці Questions, Results, ImageStorage)
+- Без Airtable — дані в браузері (localStorage) для локальної розробки
 
 ## Локальний запуск
 
@@ -16,7 +16,7 @@ npm install
 npm run dev
 ```
 
-Відкрийте [http://localhost:3000](http://localhost:3000). Без змінних Supabase/Airtable тести та результати зберігаються в localStorage.
+Відкрийте [http://localhost:3000](http://localhost:3000). Без Airtable тести та результати зберігаються в localStorage.
 
 ---
 
@@ -30,7 +30,7 @@ npm run dev
    - `NEXT_PUBLIC_USE_AIRTABLE=true`
 
 2. Таблиці в базі:
-   - **Questions** — Grade, Subject, SortOrder, Type, Question, Options, CorrectIndex, Pairs, **CorrectAnswer** (для типу «Своя відповідь»: Single line text — правильна відповідь), Image, OptionImages, Weight. (Назву таблиці можна змінити через `AIRTABLE_QUESTIONS_TABLE` у .env.)
+   - **Questions** — Grade, Subject, SortOrder, **Type** (Single select: Multiple, Matching, short_answer), Question, Options, CorrectIndex, Pairs (JSON: масив `[{ left, right, leftImageUrl?, rightImageUrl? }]` для типу Відповідність), **CorrectAnswer**, Image, OptionImages, **ImageScale** (число, масштаб зображення в тесті: 1 = 100%), Weight. (Назву таблиці можна змінити через `AIRTABLE_QUESTIONS_TABLE` у .env.)
    - **Results** — Name, Invitation, Grade, Date, Subjects, AnswerDetails.
    - **ImageStorage** — для фото питань/відповідей: поля **Content** (Long text, base64) та **Type** (Single line text, напр. `image/png`). Макс. розмір зображення ~70 КБ.
 
@@ -40,35 +40,14 @@ npm run dev
 
 ---
 
-## Деплой на Render + підключення Supabase
-
-### 1. Supabase
-
-1. Створіть проєкт на [supabase.com](https://supabase.com).
-2. **SQL Editor** → New query → вставте вміст файлу **`supabase/schema.sql`** → Run.
-3. **Storage** → New bucket → назва **`question-images`**, увімкніть **Public bucket** (щоб посилання на фото відкривалися).
-4. **Project Settings** → API — скопіюйте **Project URL** та **anon public** key.
-
-### 2. Змінні середовища на Render
-
-У вашому Web Service на Render додайте **Environment**:
-
-| Key | Value |
-|-----|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://ваш-проєкт.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ваш anon key |
-| `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET` | `question-images` |
-
-(Для локальної розробки з Supabase скопіюйте `.env.local.example` у `.env.local` і заповніть значення.)
-
-### 3. Render
+## Деплой на Render
 
 - Підключіть репозиторій GitHub.
 - Build command: `npm install && npm run build`
 - Start command: `npm start`
-- Root directory: залиште порожнім, якщо проєкт в корені репо.
+- У **Environment** додайте ті самі змінні, що й у `.env.local` (Airtable: `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID`, `NEXT_PUBLIC_USE_AIRTABLE=true`).
 
-Після деплою тести та результати зберігаються в Supabase; фото до питань — у Storage.
+Після деплою тести та результати зберігаються в Airtable; фото до питань — у таблиці ImageStorage.
 
 ---
 
@@ -76,8 +55,8 @@ npm run dev
 
 - **Головна** (`/`) — ПІБ, номер запрошення, клас (8, 9, 10, 11). Старт тесту (спочатку І блок).
 - **Тест** — І блок: українська мова + математика (1 год); ІІ блок: історія + англійська (1 год). Таймер, навігація по питаннях, підтримка **фото до питання**.
-- **Результати** (`/results`) — бали по всіх 4 предметах, збереження в Supabase або localStorage.
+- **Результати** (`/results`) — бали по всіх 4 предметах, збереження в Airtable або localStorage.
 - **Результати вчителя** (`/admin-results`) — таблиця з фільтром за класом.
-- **Внесення тестів** (`/admin`) — додавання/редагування питань по класу та предмету, **завантаження фото** (при підключеному Supabase).
+- **Внесення тестів** (`/admin`) — додавання/редагування питань по класу та предмету, **завантаження фото** (зберігаються в Airtable ImageStorage).
 
-Питання з фото: в адмінці при створенні/редагуванні питання можна завантажити зображення — воно зберігається в Supabase Storage і показується учням над текстом питання.
+Питання з фото: в адмінці при створенні/редагуванні питання можна завантажити зображення — воно зберігається в Airtable і показується учням над текстом питання.

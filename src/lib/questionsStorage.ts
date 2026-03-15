@@ -1,11 +1,5 @@
 import type { QuestionBank, Grade, SubjectId, Question } from "@/types";
 import { grades, subjectIds } from "@/constants/questions";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
-import {
-  getQuestionBankFromSupabase,
-  saveQuestionsForSubjectToSupabase,
-  getQuestionsForBlockFromSupabase,
-} from "@/lib/supabase/questions";
 
 const STORAGE_KEY = "nmt_questions";
 
@@ -54,7 +48,6 @@ export async function getQuestionBank(): Promise<QuestionBank> {
       return emptyBank();
     }
   }
-  if (isSupabaseConfigured()) return getQuestionBankFromSupabase();
   return Promise.resolve(getQuestionBankLocal());
 }
 
@@ -75,7 +68,6 @@ export async function saveQuestionsForSubject(
     }
     return;
   }
-  if (isSupabaseConfigured()) return saveQuestionsForSubjectToSupabase(grade, subject, questions);
   if (typeof window === "undefined") return Promise.resolve();
   const bank = getQuestionBankLocal();
   bank[grade][subject] = questions;
@@ -97,7 +89,6 @@ export async function getQuestionsForBlock(
     }
     return out;
   }
-  if (isSupabaseConfigured()) return getQuestionsForBlockFromSupabase(grade, block);
   const bank = getQuestionBankLocal();
   const subjects: SubjectId[] = block === 1 ? ["ukrainian", "math"] : ["history", "english"];
   const out: { subject: SubjectId; question: Question; index: number }[] = [];

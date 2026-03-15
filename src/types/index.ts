@@ -21,15 +21,21 @@ export interface MultipleChoiceQuestion {
   correctIndex: number;
   /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
   weight?: number;
-  /** URL фото до питання (Supabase Storage або зовнішнє) */
+  /** URL фото до питання (Airtable ImageStorage або зовнішнє) */
   image_url?: string;
   /** URL фото до варіантів відповіді (індекс = options), опційно для кожного варіанту */
   option_image_urls?: (string | undefined)[];
+  /** Масштаб відображення зображення в тесті (1 = 100%, 0.5 = 50%, 2 = 200%) */
+  image_scale?: number;
 }
 
 export interface MatchingPair {
   left: string;
   right: string;
+  /** URL зображення для лівого елемента пари */
+  leftImageUrl?: string;
+  /** URL зображення для правого елемента пари */
+  rightImageUrl?: string;
 }
 
 export interface MatchingQuestion {
@@ -37,10 +43,12 @@ export interface MatchingQuestion {
   id: string;
   question: string;
   pairs: MatchingPair[];
-  /** URL фото до питання (Supabase Storage або зовнішнє) */
+  /** URL фото до питання (Airtable ImageStorage або зовнішнє) */
   image_url?: string;
   /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
   weight?: number;
+  /** Масштаб відображення зображення в тесті (1 = 100%) */
+  image_scale?: number;
 }
 
 /** Своя відповідь: учень вводить число або текст, порівняння з правильним варіантом */
@@ -53,6 +61,8 @@ export interface ShortAnswerQuestion {
   /** Вага питання (балів за правильну відповідь), за замовчуванням 1 */
   weight?: number;
   image_url?: string;
+  /** Масштаб відображення зображення в тесті (1 = 100%) */
+  image_scale?: number;
 }
 
 export type Question = MultipleChoiceQuestion | MatchingQuestion | ShortAnswerQuestion;

@@ -78,6 +78,8 @@ interface AirtableQuestionFields {
   Image?: { url: string }[];
   OptionImages?: string;
   Weight?: number;
+  /** Масштаб зображення в тесті (1 = 100%) */
+  ImageScale?: number;
 }
 
 function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Question {
@@ -104,6 +106,7 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
         /* ignore */
       }
     }
+    if (typeof f.ImageScale === "number" && f.ImageScale > 0) q.image_scale = f.ImageScale;
     return q;
   }
   if (f.Type === "short_answer") {
@@ -117,18 +120,29 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
     if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
       q.weight = f.Weight;
     }
+    if (typeof f.ImageScale === "number" && f.ImageScale > 0) q.image_scale = f.ImageScale;
     return q;
   }
+  const pairsRaw = f.Pairs ? JSON.parse(f.Pairs) : [];
+  const pairs = Array.isArray(pairsRaw)
+    ? pairsRaw.map((p: { left?: string; right?: string; leftImageUrl?: string; rightImageUrl?: string }) => ({
+        left: String(p?.left ?? ""),
+        right: String(p?.right ?? ""),
+        ...(p?.leftImageUrl && { leftImageUrl: p.leftImageUrl }),
+        ...(p?.rightImageUrl && { rightImageUrl: p.rightImageUrl }),
+      }))
+    : [];
   const q: MatchingQuestion = {
     type: "matching",
     id: record.id,
     question: f.Question || "",
-    pairs: f.Pairs ? JSON.parse(f.Pairs) : [],
+    pairs,
   };
   if (imageUrl) q.image_url = imageUrl;
   if (typeof f.Weight === "number" && !Number.isNaN(f.Weight)) {
     q.weight = f.Weight;
   }
+  if (typeof f.ImageScale === "number" && f.ImageScale > 0) q.image_scale = f.ImageScale;
   return q;
 }
 
@@ -210,6 +224,8 @@ function questionToFields(
   }
   const imgUrl = (q as Question & { image_url?: string }).image_url;
   if (imgUrl) fields.Image = [{ url: imgUrl }];
+  const scale = (q as Question & { image_scale?: number }).image_scale;
+  if (typeof scale === "number" && scale > 0) fields.ImageScale = scale;
   return fields;
 }
 

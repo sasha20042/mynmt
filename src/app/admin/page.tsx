@@ -80,6 +80,7 @@ export default function AdminTestsPage() {
   const [saved, setSaved] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingOptionIndex, setUploadingOptionIndex] = useState<number | null>(null);
+  const [uploadingPairImage, setUploadingPairImage] = useState<{ pairIndex: number; side: "left" | "right" } | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const draftRef = useRef<HTMLDivElement>(null);
@@ -517,6 +518,29 @@ export default function AdminTestsPage() {
                   </div>
                 )}
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Масштаб зображення в тесті
+                </label>
+                <select
+                  value={String((draft as Question & { image_scale?: number }).image_scale ?? 1)}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setDraft({ ...draft, image_scale: Number.isFinite(v) && v > 0 ? v : 1 } as Question & { image_scale?: number });
+                  }}
+                  className="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  <option value="0.5">50%</option>
+                  <option value="0.75">75%</option>
+                  <option value="1">100%</option>
+                  <option value="1.25">125%</option>
+                  <option value="1.5">150%</option>
+                  <option value="2">200%</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Відображати зображення питання (і варіантів) у тесті у вибраному масштабі.
+                </p>
+              </div>
               {draft.type === "short_answer" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -723,35 +747,71 @@ export default function AdminTestsPage() {
               {draft.type === "matching" && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Пари (лівий стовпчик — правий)
+                    Пари (лівий стовпчик — правий), можна додати фото до елементів
                   </label>
                   {(draft as MatchingQuestion).pairs.map((pair, i) => (
-                    <div key={i} className="flex items-center gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={pair.left}
-                        onChange={(e) => {
-                          const pairs = (draft as MatchingQuestion).pairs.map(
-                            (p, j) => (j === i ? { ...p, left: e.target.value } : p)
-                          );
-                          setDraft({ ...draft, pairs } as MatchingQuestion);
-                        }}
-                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
-                        placeholder="Лівий елемент"
-                      />
-                      <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input
-                        type="text"
-                        value={pair.right}
-                        onChange={(e) => {
-                          const pairs = (draft as MatchingQuestion).pairs.map(
-                            (p, j) => (j === i ? { ...p, right: e.target.value } : p)
-                          );
-                          setDraft({ ...draft, pairs } as MatchingQuestion);
-                        }}
-                        className="flex-1 px-3 py-2 rounded-lg border border-slate-300"
-                        placeholder="Правий елемент"
-                      />
+                    <div key={i} className="mb-4 p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                      <div className="flex flex-wrap items-start gap-2">
+                        <div className="flex-1 min-w-[140px] space-y-1">
+                          <input
+                            type="text"
+                            value={pair.left}
+                            onChange={(e) => {
+                              const pairs = (draft as MatchingQuestion).pairs.map(
+                                (p, j) => (j === i ? { ...p, left: e.target.value } : p)
+                              );
+                              setDraft({ ...draft, pairs } as MatchingQuestion);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                            placeholder="Лівий елемент"
+                          />
+                          {pair.leftImageUrl ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[100px] max-h-16">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={pair.leftImageUrl} alt="" className="w-full h-full object-contain bg-white" />
+                              </div>
+                              <button type="button" onClick={() => { const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, leftImageUrl: undefined } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); }} className="text-xs text-red-600 hover:underline">Видалити</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1 flex-wrap" onPaste={async (e) => { const file = e.clipboardData?.files?.[0]; if (!file?.type.startsWith("image/")) return; e.preventDefault(); setImageError(null); setUploadingPairImage({ pairIndex: i, side: "left" }); try { const url = await processImageBlob(file); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, leftImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } catch (err) { setImageError(err instanceof Error ? err.message : "Помилка"); } finally { setUploadingPairImage(null); } }}>
+                              <input type="file" accept="image/*" disabled={!!uploadingPairImage} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setUploadingPairImage({ pairIndex: i, side: "left" }); try { const url = await processImageBlob(file); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, leftImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } finally { setUploadingPairImage(null); e.target.value = ""; } }} className="text-xs file:mr-1 file:py-1 file:px-2 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800" />
+                              <button type="button" disabled={!!uploadingPairImage} onClick={async () => { try { const items = await navigator.clipboard.read(); for (const item of items) { const blob = await getImageFromClipboardItem(item); if (blob) { setUploadingPairImage({ pairIndex: i, side: "left" }); try { const url = await processImageBlob(blob); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, leftImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } finally { setUploadingPairImage(null); } return; } } } catch { /* ignore */ } }} className="inline-flex items-center gap-0.5 px-2 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-medium hover:bg-indigo-200"><ImagePlus className="w-3 h-3" /> Вставити</button>
+                              {uploadingPairImage?.pairIndex === i && uploadingPairImage?.side === "left" && <span className="text-xs text-slate-500">Завантаження…</span>}
+                            </div>
+                          )}
+                        </div>
+                        <Link2 className="w-4 h-4 text-slate-400 shrink-0 mt-2" />
+                        <div className="flex-1 min-w-[140px] space-y-1">
+                          <input
+                            type="text"
+                            value={pair.right}
+                            onChange={(e) => {
+                              const pairs = (draft as MatchingQuestion).pairs.map(
+                                (p, j) => (j === i ? { ...p, right: e.target.value } : p)
+                              );
+                              setDraft({ ...draft, pairs } as MatchingQuestion);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-300"
+                            placeholder="Правий елемент"
+                          />
+                          {pair.rightImageUrl ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="rounded-lg border border-slate-200 overflow-hidden max-w-[100px] max-h-16">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={pair.rightImageUrl} alt="" className="w-full h-full object-contain bg-white" />
+                              </div>
+                              <button type="button" onClick={() => { const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, rightImageUrl: undefined } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); }} className="text-xs text-red-600 hover:underline">Видалити</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1 flex-wrap" onPaste={async (e) => { const file = e.clipboardData?.files?.[0]; if (!file?.type.startsWith("image/")) return; e.preventDefault(); setImageError(null); setUploadingPairImage({ pairIndex: i, side: "right" }); try { const url = await processImageBlob(file); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, rightImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } catch (err) { setImageError(err instanceof Error ? err.message : "Помилка"); } finally { setUploadingPairImage(null); } }}>
+                              <input type="file" accept="image/*" disabled={!!uploadingPairImage} onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; setUploadingPairImage({ pairIndex: i, side: "right" }); try { const url = await processImageBlob(file); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, rightImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } finally { setUploadingPairImage(null); e.target.value = ""; } }} className="text-xs file:mr-1 file:py-1 file:px-2 file:rounded file:border-0 file:bg-indigo-100 file:text-indigo-800" />
+                              <button type="button" disabled={!!uploadingPairImage} onClick={async () => { try { const items = await navigator.clipboard.read(); for (const item of items) { const blob = await getImageFromClipboardItem(item); if (blob) { setUploadingPairImage({ pairIndex: i, side: "right" }); try { const url = await processImageBlob(blob); const pairs = (draft as MatchingQuestion).pairs.map((p, j) => (j === i ? { ...p, rightImageUrl: url } : p)); setDraft({ ...draft, pairs } as MatchingQuestion); } finally { setUploadingPairImage(null); } return; } } } catch { /* ignore */ } }} className="inline-flex items-center gap-0.5 px-2 py-1 rounded bg-indigo-100 text-indigo-800 text-xs font-medium hover:bg-indigo-200"><ImagePlus className="w-3 h-3" /> Вставити</button>
+                              {uploadingPairImage?.pairIndex === i && uploadingPairImage?.side === "right" && <span className="text-xs text-slate-500">Завантаження…</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                   <button
