@@ -394,10 +394,13 @@ export default function AdminTestsPage() {
                   onChange={(e) =>
                     setDraft({ ...draft, question: e.target.value })
                   }
-                  rows={3}
+                  rows={4}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   placeholder="Введіть текст питання..."
                 />
+                <p className="text-xs text-slate-500 mt-1">
+                  Формат: <strong>**жирний**</strong>, <em>*курсив*</em>, окремий рядок <code className="bg-slate-100 px-1 rounded">[[по центру]]</code>, порожній рядок — абзац.
+                </p>
                 <div className="mt-3 flex items-center gap-3">
                   <label className="block text-sm font-medium text-slate-700">
                     Вага питання (бали)

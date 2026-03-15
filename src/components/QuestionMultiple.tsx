@@ -2,6 +2,7 @@
 
 import type { MultipleChoiceQuestion } from "@/types";
 import { ZoomableImage } from "@/components/ZoomableImage";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Props {
   question: MultipleChoiceQuestion;
@@ -26,7 +27,7 @@ export function QuestionMultiple({ question, value, onChange }: Props) {
           />
         </div>
       )}
-      <p className="text-slate-800 font-medium mb-4">{question.question}</p>
+      <FormattedText text={question.question} />
       <div className="space-y-2">
         {question.options.map((opt, i) => {
           const optImg = question.option_image_urls?.[i];

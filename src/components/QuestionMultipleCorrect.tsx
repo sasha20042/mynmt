@@ -2,6 +2,7 @@
 
 import type { MultipleCorrectQuestion } from "@/types";
 import { ZoomableImage } from "@/components/ZoomableImage";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Props {
   question: MultipleCorrectQuestion;
@@ -35,7 +36,7 @@ export function QuestionMultipleCorrect({ question, value, onChange }: Props) {
           />
         </div>
       )}
-      <p className="text-slate-800 font-medium mb-4">{question.question}</p>
+      <FormattedText text={question.question} />
       <p className="text-sm text-slate-600 mb-3">Оберіть усі правильні варіанти:</p>
       <div className="space-y-2">
         {question.options.map((opt, i) => {

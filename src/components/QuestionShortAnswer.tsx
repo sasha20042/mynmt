@@ -2,6 +2,7 @@
 
 import type { ShortAnswerQuestion } from "@/types";
 import { ZoomableImage } from "@/components/ZoomableImage";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Props {
   question: ShortAnswerQuestion;
@@ -26,7 +27,7 @@ export function QuestionShortAnswer({ question, value, onChange }: Props) {
           />
         </div>
       )}
-      <p className="text-slate-800 font-medium mb-4">{question.question}</p>
+      <FormattedText text={question.question} />
       <label className="block">
         <span className="sr-only">Відповідь</span>
         <input

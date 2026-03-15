@@ -2,6 +2,7 @@
 
 import type { MatchingQuestion } from "@/types";
 import { ZoomableImage } from "@/components/ZoomableImage";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Props {
   question: MatchingQuestion;
@@ -43,7 +44,7 @@ export function QuestionMatching({ question, value, onChange }: Props) {
           />
         </div>
       )}
-      <p className="text-slate-800 font-medium mb-4">{question.question}</p>
+      <FormattedText text={question.question} />
       <div className="space-y-4">
         {question.pairs.map((pair, i) => (
           <div
