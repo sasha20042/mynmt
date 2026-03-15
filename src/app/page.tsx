@@ -140,7 +140,7 @@ export default function WelcomePage() {
             type="button"
             onClick={handleStart}
             disabled={loading}
-            className="mt-8 w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white font-medium flex items-center justify-center gap-2 transition shadow-md"
+            className="mt-8 w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white font-medium flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.99]"
           >
             {loading ? (
               <>

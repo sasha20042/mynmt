@@ -316,17 +316,33 @@ function TestPageContent() {
     const breakM = Math.floor((breakSecondsLeft ?? 0) / 60);
     const breakS = (breakSecondsLeft ?? 0) % 60;
     const breakTimeStr = `${breakM}:${breakS.toString().padStart(2, "0")}`;
+    const skipBreak = () => {
+      if (typeof window !== "undefined") sessionStorage.removeItem(BREAK_END_KEY);
+      setBreakSecondsLeft(null);
+    };
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
-          <h2 className="text-xl font-semibold text-slate-800 mb-2">Перерва</h2>
-          <p className="text-slate-600 mb-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 flex flex-col items-center justify-center p-6 transition-colors duration-300">
+        <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-3xl border border-slate-200/80 shadow-xl shadow-slate-200/50 p-8 text-center transition-all duration-300">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-indigo-100 flex items-center justify-center">
+            <Clock className="w-7 h-7 text-indigo-600" />
+          </div>
+          <h2 className="text-2xl font-semibold text-slate-800 mb-2">Перерва</h2>
+          <p className="text-slate-600 mb-6 leading-relaxed">
             Під час перерви проходити тестування та здавати тести не можна. До початку блоку 2 залишилось:
           </p>
-          <p className="font-mono text-3xl font-bold text-indigo-600 mb-6">{breakTimeStr}</p>
-          <p className="text-sm text-slate-500">
-            Після закінчення перерви сторінка оновиться автоматично. Можна залишити її відкритою.
+          <p className="font-mono text-4xl font-bold tabular-nums text-indigo-600 mb-2 tracking-tight">
+            {breakTimeStr}
           </p>
+          <p className="text-sm text-slate-500 mb-8">
+            Після закінчення перерви сторінка оновиться автоматично.
+          </p>
+          <button
+            type="button"
+            onClick={skipBreak}
+            className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all duration-200"
+          >
+            Пропустити перерву
+          </button>
         </div>
       </div>
     );
@@ -367,7 +383,7 @@ function TestPageContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="border-b border-slate-200 bg-white shrink-0">
+      <header className="border-b border-slate-200 bg-white shrink-0 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-4">
             <span className="font-medium text-slate-800">
@@ -377,17 +393,17 @@ function TestPageContent() {
           </div>
           <div className="flex items-center gap-3">
             <div
-              className={`flex items-center gap-2 ${
+              className={`flex items-center gap-2 transition-colors duration-200 ${
                 secondsLeft <= 300 ? "text-red-600" : "text-slate-600"
               }`}
             >
               <Clock className="w-5 h-5" />
-              <span className="font-mono font-medium">{formatTime(secondsLeft)}</span>
+              <span className="font-mono font-medium tabular-nums">{formatTime(secondsLeft)}</span>
             </div>
             <button
               type="button"
               onClick={finishBlock}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
             >
               <Send className="w-4 h-4" />
               {block === 1 ? "Здати блок 1" : "Здати тест"}
@@ -398,7 +414,7 @@ function TestPageContent() {
 
       <div className="flex-1 flex max-w-5xl w-full mx-auto gap-6 p-4">
         <aside className="w-44 shrink-0 hidden sm:block">
-          <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4">
+          <div className="sticky top-4 bg-white rounded-xl border border-slate-200 p-4 shadow-sm transition-shadow duration-200 hover:shadow">
             <p className="text-xs font-medium text-slate-700 mb-3">Питання</p>
             <div className="flex flex-wrap gap-2">
               {questionList.map((q, i) => (
@@ -406,12 +422,12 @@ function TestPageContent() {
                   key={q.id}
                   type="button"
                   onClick={() => setCurrentIndex(i)}
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition ${
-                    currentIndex === i
-                      ? "bg-indigo-600 text-white"
-                      : answers[q.id] !== undefined
-                        ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
-                        : "bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300"
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200 ${
+                      currentIndex === i
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : answers[q.id] !== undefined
+                          ? "bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200/80"
+                          : "bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300"
                   }`}
                 >
                   {i + 1}
@@ -425,7 +441,7 @@ function TestPageContent() {
         </aside>
 
         <div className="flex-1 min-w-0">
-          <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
             {currentSubject && (
               <p className="text-xs text-indigo-700 font-medium mb-1">
                 {subjectLabels[currentSubject]}
@@ -472,7 +488,7 @@ function TestPageContent() {
                 type="button"
                 onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
                 disabled={currentIndex === 0}
-                className="flex items-center gap-1 text-slate-600 hover:text-slate-800 disabled:opacity-50"
+                className="flex items-center gap-1 text-slate-600 hover:text-slate-800 disabled:opacity-50 transition-colors duration-200"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Назад
@@ -481,7 +497,7 @@ function TestPageContent() {
                 <button
                   type="button"
                   onClick={() => setCurrentIndex((i) => i + 1)}
-                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 font-medium border border-slate-300"
+                  className="flex items-center gap-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-800 hover:bg-slate-200 font-medium border border-slate-300 transition-all duration-200 active:scale-[0.98]"
                 >
                   Далі
                   <ChevronRight className="w-5 h-5" />
@@ -490,7 +506,7 @@ function TestPageContent() {
                 <button
                   type="button"
                   onClick={finishBlock}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium border border-indigo-700"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium border border-indigo-700 shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
                 >
                   <Send className="w-4 h-4" />
                   {block === 1 ? "Завершити блок і перейти до блоку 2" : "Завершити тест"}
@@ -505,10 +521,10 @@ function TestPageContent() {
                 key={q.id}
                 type="button"
                 onClick={() => setCurrentIndex(i)}
-                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium border ${
+                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium border transition-all duration-200 ${
                   currentIndex === i
-                    ? "bg-indigo-600 text-white border-indigo-700"
-                    : "bg-slate-200 text-slate-800 border-slate-300"
+                    ? "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                    : "bg-slate-200 text-slate-800 border-slate-300 hover:bg-slate-300"
                 }`}
               >
                 {i + 1}
@@ -520,8 +536,8 @@ function TestPageContent() {
 
       {timeUpModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
-            <p className="text-lg font-medium text-slate-800 mb-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-200/80">
+            <p className="text-lg font-medium text-slate-800 mb-6 leading-relaxed">
               Час закінчився. Поточні відповіді зараховано.
             </p>
             <button
@@ -530,7 +546,7 @@ function TestPageContent() {
                 setTimeUpModalOpen(false);
                 finishBlock();
               }}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
             >
               OK
             </button>
