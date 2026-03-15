@@ -1,6 +1,7 @@
 "use client";
 
 import type { ShortAnswerQuestion } from "@/types";
+import { ZoomableImage } from "@/components/ZoomableImage";
 
 interface Props {
   question: ShortAnswerQuestion;
@@ -16,12 +17,12 @@ export function QuestionShortAnswer({ question, value, onChange }: Props) {
     <div>
       {question.image_url && (
         <div className="mb-4 rounded-xl overflow-x-auto border border-slate-200 bg-slate-50 max-w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <ZoomableImage
             src={question.image_url}
             alt="До питання"
             style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
             className="object-contain"
+            containerClassName="rounded-xl overflow-hidden"
           />
         </div>
       )}

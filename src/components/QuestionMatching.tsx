@@ -1,6 +1,7 @@
 "use client";
 
 import type { MatchingQuestion } from "@/types";
+import { ZoomableImage } from "@/components/ZoomableImage";
 
 interface Props {
   question: MatchingQuestion;
@@ -33,12 +34,12 @@ export function QuestionMatching({ question, value, onChange }: Props) {
     <div>
       {question.image_url && (
         <div className="mb-4 rounded-xl overflow-x-auto border border-slate-200 bg-slate-50 max-w-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <ZoomableImage
             src={question.image_url}
             alt="До питання"
             style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
             className="object-contain"
+            containerClassName="rounded-xl overflow-hidden"
           />
         </div>
       )}
@@ -52,15 +53,13 @@ export function QuestionMatching({ question, value, onChange }: Props) {
             {/* Лівий елемент пари: фото (якщо є) + текст */}
             <div className="min-w-[140px] flex flex-col gap-1.5">
               {pair.leftImageUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 w-full max-w-[200px]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={pair.leftImageUrl}
-                    alt=""
-                    style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
-                    className="object-contain max-h-32 w-full"
-                  />
-                </div>
+                <ZoomableImage
+                  src={pair.leftImageUrl}
+                  alt=""
+                  style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
+                  className="object-contain max-h-32 w-full"
+                  containerClassName="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 w-full max-w-[200px]"
+                />
               )}
               <span className="font-medium text-slate-700">{pair.left}</span>
             </div>
@@ -85,13 +84,13 @@ export function QuestionMatching({ question, value, onChange }: Props) {
                         }`}
                       >
                         {p.rightImageUrl && (
-                          <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50 w-full aspect-square max-h-28">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                          <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50 w-full aspect-square max-h-28 relative">
+                            <ZoomableImage
                               src={p.rightImageUrl}
                               alt=""
                               style={{ width: scalePct(scale), maxWidth: "none", display: "block" }}
                               className="object-contain w-full h-full"
+                              containerClassName="w-full h-full"
                             />
                           </div>
                         )}
