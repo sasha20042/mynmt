@@ -49,10 +49,11 @@ function computeSubjectScores(
     if (q.type === "matching" && Array.isArray(val)) {
       const mat = q as import("@/types").MatchingQuestion;
       const n = mat.pairs.length;
-      out[subject].total += n;
-      let correctPairs = 0;
-      for (let i = 0; i < n; i++) if (val[i] === i) correctPairs++;
-      out[subject].correct += correctPairs;
+      for (let i = 0; i < n; i++) {
+        const w = typeof mat.pairs[i]?.weight === "number" && mat.pairs[i].weight === 0 ? 0 : 1;
+        out[subject].total += w;
+        if (val[i] === i) out[subject].correct += w;
+      }
     } else if (q.type === "multiple_correct" && Array.isArray(val)) {
       const mc = q as MultipleCorrectQuestion;
       const correctSet = new Set(mc.correctIndices);
@@ -109,6 +110,13 @@ function computeAnswerDetails(
         parts.push(`${i + 1}) ${left} → ${right}`);
       }
       userAnswer = parts.join("; ");
+      const correctParts: string[] = [];
+      for (let i = 0; i < mat.pairs.length; i++) {
+        const left = mat.pairs[i]?.left ?? "";
+        const right = mat.pairs[i]?.right ?? "—";
+        correctParts.push(`${i + 1}) ${left} → ${right}`);
+      }
+      correctAnswer = correctParts.join("; ");
     } else if (q.type === "short_answer" && typeof val === "string") {
       const sa = q as ShortAnswerQuestion;
       ok = isShortAnswerCorrect(val, sa.correctAnswer);

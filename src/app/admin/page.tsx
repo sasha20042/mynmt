@@ -915,6 +915,22 @@ export default function AdminTestsPage() {
                   </label>
                   {(draft as MatchingQuestion).pairs.map((pair, i) => (
                     <div key={i} className="mb-4 p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={pair.weight === 0}
+                            onChange={(e) => {
+                              const pairs = (draft as MatchingQuestion).pairs.map(
+                                (p, j) => (j === i ? { ...p, weight: e.target.checked ? 0 : 1 } : p)
+                              );
+                              setDraft({ ...draft, pairs } as MatchingQuestion);
+                            }}
+                            className="rounded border-slate-300 text-amber-600"
+                          />
+                          <span>0 балів (зайва відповідь, не зараховується)</span>
+                        </label>
+                      </div>
                       <div className="flex flex-wrap items-start gap-2">
                         <div className="flex-1 min-w-[140px] space-y-1">
                           <input
@@ -983,7 +999,7 @@ export default function AdminTestsPage() {
                     onClick={() => {
                       setDraft({
                         ...draft,
-                        pairs: [...(draft as MatchingQuestion).pairs, { left: "", right: "" }],
+                        pairs: [...(draft as MatchingQuestion).pairs, { left: "", right: "", weight: 1 }],
                       } as MatchingQuestion);
                     }}
                     className="text-sm text-indigo-600 hover:underline mt-1"

@@ -36,6 +36,8 @@ export interface MatchingPair {
   leftImageUrl?: string;
   /** URL зображення для правого елемента пари */
   rightImageUrl?: string;
+  /** 0 = пара не зараховується (зайва відповідь), 1 або не вказано = 1 бал за правильну пару */
+  weight?: number;
 }
 
 export interface MatchingQuestion {

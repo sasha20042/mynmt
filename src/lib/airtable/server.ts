@@ -159,11 +159,12 @@ function recordToQuestion(record: AirtableRecord<AirtableQuestionFields>): Quest
   }
   const pairsRaw = f.Pairs ? JSON.parse(f.Pairs) : [];
   const pairs = Array.isArray(pairsRaw)
-    ? pairsRaw.map((p: { left?: string; right?: string; leftImageUrl?: string; rightImageUrl?: string }) => ({
+    ? pairsRaw.map((p: { left?: string; right?: string; leftImageUrl?: string; rightImageUrl?: string; weight?: number }) => ({
         left: String(p?.left ?? ""),
         right: String(p?.right ?? ""),
         ...(p?.leftImageUrl && { leftImageUrl: p.leftImageUrl }),
         ...(p?.rightImageUrl && { rightImageUrl: p.rightImageUrl }),
+        ...(typeof p?.weight === "number" && { weight: p.weight }),
       }))
     : [];
   const q: MatchingQuestion = {
