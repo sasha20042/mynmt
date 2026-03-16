@@ -179,6 +179,9 @@ function TestPageContent() {
             if (q.type === "multiple" || q.type === "multiple_correct") {
               const base = q.options.map((_, i) => i);
               newOrder[q.id] = shuffle(base);
+            } else if (q.type === "matching") {
+              const base = q.pairs.map((_, i) => i);
+              newOrder[q.id] = shuffle(base);
             }
           }
         }
@@ -478,6 +481,7 @@ function TestPageContent() {
                     question={currentQuestion as import("@/types").MatchingQuestion}
                     value={answers[currentQuestion.id] as number[] | undefined}
                     onChange={(v) => setAnswer(currentQuestion.id, v)}
+                    order={optionOrder[currentQuestion.id]}
                   />
                 )}
                 {currentQuestion.type === "short_answer" && (

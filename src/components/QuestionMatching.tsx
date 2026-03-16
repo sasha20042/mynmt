@@ -8,6 +8,8 @@ interface Props {
   question: MatchingQuestion;
   value: number[] | undefined;
   onChange: (indices: number[]) => void;
+  /** Необов'язковий порядок відображення правих варіантів (індекси масиву pairs) */
+  order?: number[];
 }
 
 const scalePct = (scale: number | undefined) => `${((scale ?? 1) * 100).toFixed(0)}%`;
@@ -19,15 +21,20 @@ function hasAnyPairImages(question: MatchingQuestion): boolean {
   );
 }
 
-export function QuestionMatching({ question, value, onChange }: Props) {
+export function QuestionMatching({ question, value, onChange, order }: Props) {
   const n = question.pairs.length;
   const current = value ?? Array(n).fill(-1);
   const scale = question.image_scale ?? 1;
   const useCardLayout = hasAnyPairImages(question);
+  const indices = order && order.length === question.pairs.length
+    ? order
+    : question.pairs.map((_, i) => i);
 
-  const setOne = (leftIndex: number, rightIndex: number) => {
+  const setOne = (leftIndex: number, renderedIndex: number) => {
+    const originalIndex =
+      renderedIndex >= 0 && renderedIndex < indices.length ? indices[renderedIndex] : renderedIndex;
     const next = [...current];
-    next[leftIndex] = rightIndex;
+    next[leftIndex] = originalIndex;
     onChange(next);
   };
 
@@ -71,8 +78,9 @@ export function QuestionMatching({ question, value, onChange }: Props) {
             <div className="flex-1 min-w-0">
               {useCardLayout ? (
                 <div className="flex flex-wrap gap-2 min-w-max">
-                  {question.pairs.map((p, j) => {
-                    const selected = current[i] === j;
+                  {indices.map((originalIndex, j) => {
+                    const p = question.pairs[originalIndex];
+                    const selected = current[i] === originalIndex;
                     return (
                       <button
                         key={j}
@@ -106,12 +114,12 @@ export function QuestionMatching({ question, value, onChange }: Props) {
                 <select
                   value={current[i] >= 0 ? current[i] : ""}
                   onChange={(e) => setOne(i, Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xs"
+                  className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xl text-sm"
                 >
                   <option value="">Оберіть</option>
-                  {question.pairs.map((p, j) => (
-                    <option key={j} value={j}>
-                      {p.right}
+                  {indices.map((originalIndex) => (
+                    <option key={originalIndex} value={originalIndex}>
+                      {question.pairs[originalIndex].right}
                     </option>
                   ))}
                 </select>
