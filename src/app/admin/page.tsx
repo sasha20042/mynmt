@@ -18,6 +18,7 @@ import { getQuestionBank, saveQuestionsForSubject } from "@/lib/questionsStorage
 import { grades, gradeLabels, subjectLabels, subjectIds } from "@/constants/questions";
 import type { Grade, SubjectId, Question, MultipleChoiceQuestion, MatchingQuestion, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { generateId } from "@/lib/uuid";
+import { AccessGate } from "@/components/AccessGate";
 
 type EditMode = { type: "add" } | { type: "edit"; index: number };
 
@@ -201,8 +202,9 @@ export default function AdminTestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <AccessGate title="Внесення тестів">
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -1044,6 +1046,7 @@ export default function AdminTestsPage() {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </AccessGate>
   );
 }

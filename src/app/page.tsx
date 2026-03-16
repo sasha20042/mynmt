@@ -155,16 +155,6 @@ export default function WelcomePage() {
             )}
           </button>
         </div>
-
-        <p className="mt-6 text-center text-sm text-slate-500">
-          <a href="/admin-results" className="text-indigo-600 hover:underline">
-            Результати
-          </a>
-          {" · "}
-          <a href="/admin" className="text-indigo-600 hover:underline">
-            Адмін: внесення тестів
-          </a>
-        </p>
       </main>
     </div>
   );

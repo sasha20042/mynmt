@@ -6,6 +6,7 @@ import { Trash2, Filter, ArrowLeft, GraduationCap, ChevronDown, ChevronUp, Check
 import { getStoredResults, deleteResult, clearAllResults } from "@/lib/storage";
 import { subjectLabels, gradeLabels, grades } from "@/constants/questions";
 import type { TestResult, Grade, SubjectId } from "@/types";
+import { AccessGate } from "@/components/AccessGate";
 
 const subjectIds: SubjectId[] = ["ukrainian", "math", "history", "english"];
 
@@ -77,8 +78,9 @@ export default function AdminResultsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <AccessGate title="Результати тестувань">
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -591,6 +593,7 @@ export default function AdminResultsPage() {
           </div>
         )}
       </main>
-    </div>
+      </div>
+    </AccessGate>
   );
 }
