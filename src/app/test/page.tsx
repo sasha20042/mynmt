@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
-import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, BREAK_DURATION_SEC, blockSubjects } from "@/constants/questions";
+import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, blockSubjects } from "@/constants/questions";
 import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
@@ -12,7 +12,6 @@ import { QuestionShortAnswer } from "@/components/QuestionShortAnswer";
 import { QuestionMultipleCorrect } from "@/components/QuestionMultipleCorrect";
 
 const BLOCK1_STORAGE = "nmt_block1_scores";
-const BREAK_END_KEY = "nmt_break_end_ts";
 
 function parseParams(searchParams: ReturnType<typeof useSearchParams>) {
   const name = searchParams.get("name") ?? "";
@@ -85,24 +84,61 @@ function computeAnswerDetails(
     if (!out[subject]) out[subject] = [];
     const val = answers[q.id];
     let ok = false;
+    let userAnswer: string | undefined;
+    let correctAnswer: string | undefined;
+    let meta: string | undefined;
     if (q.type === "multiple" && typeof val === "number") {
-      ok = (q as import("@/types").MultipleChoiceQuestion).correctIndex === val;
+      const mq = q as import("@/types").MultipleChoiceQuestion;
+      ok = mq.correctIndex === val;
+      if (val >= 0 && val < mq.options.length) {
+        userAnswer = mq.options[val];
+      }
+      if (mq.correctIndex >= 0 && mq.correctIndex < mq.options.length) {
+        correctAnswer = mq.options[mq.correctIndex];
+      }
     } else if (q.type === "matching" && Array.isArray(val)) {
       const mat = q as import("@/types").MatchingQuestion;
       ok = mat.pairs.every((_, i) => val[i] === i);
+      const parts: string[] = [];
+      for (let i = 0; i < mat.pairs.length; i++) {
+        const left = mat.pairs[i]?.left ?? "";
+        const rightIdx = (val as number[])[i];
+        const right = rightIdx != null && rightIdx >= 0 && rightIdx < mat.pairs.length
+          ? mat.pairs[rightIdx].right
+          : "—";
+        parts.push(`${i + 1}) ${left} → ${right}`);
+      }
+      userAnswer = parts.join("; ");
     } else if (q.type === "short_answer" && typeof val === "string") {
-      ok = isShortAnswerCorrect(val, (q as ShortAnswerQuestion).correctAnswer);
+      const sa = q as ShortAnswerQuestion;
+      ok = isShortAnswerCorrect(val, sa.correctAnswer);
+      userAnswer = val;
+      correctAnswer = sa.correctAnswer;
     } else if (q.type === "multiple_correct" && Array.isArray(val)) {
       const mc = q as MultipleCorrectQuestion;
       const correctSet = new Set(mc.correctIndices);
       const userArr = val as number[];
       ok = correctSet.size === userArr.length && userArr.every((i) => correctSet.has(i));
+      const userLabels = userArr
+        .filter((i) => i >= 0 && i < mc.options.length)
+        .map((i) => mc.options[i]);
+      const correctLabels = mc.correctIndices
+        .filter((i) => i >= 0 && i < mc.options.length)
+        .map((i) => mc.options[i]);
+      userAnswer = userLabels.join("; ");
+      correctAnswer = correctLabels.join("; ");
+      let correctCount = 0;
+      for (const i of userArr) if (correctSet.has(i)) correctCount++;
+      meta = `Правильних варіантів у відповіді учня: ${correctCount} з ${correctSet.size}`;
     }
     const snippet = q.question.trim().slice(0, 100);
     out[subject].push({
       questionId: q.id,
       correct: ok,
       questionSnippet: snippet || undefined,
+      userAnswer: userAnswer || undefined,
+      correctAnswer: correctAnswer || undefined,
+      meta: meta || undefined,
     });
   }
   return out as Record<SubjectId, AnswerDetailItem[]>;
@@ -115,6 +151,8 @@ function TestPageContent() {
 
   const [blockItems, setBlockItems] = useState<{ subject: SubjectId; question: import("@/types").Question; index: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [transitionToBlock2, setTransitionToBlock2] = useState(false);
+  const [optionOrder, setOptionOrder] = useState<Record<string, number[]>>({});
   const subjectsInBlock = block === 1 ? blockSubjects[1] : blockSubjects[2];
   const questionList = useMemo(() => blockItems.map((x) => x.question), [blockItems]);
 
@@ -124,6 +162,27 @@ function TestPageContent() {
     getQuestionsForBlock(grade, block).then((items) => {
       if (!cancelled) {
         setBlockItems(items);
+        // Задаємо випадковий порядок варіантів для вибраних предметів
+        const newOrder: Record<string, number[]> = {};
+        const shuffle = (arr: number[]) => {
+          const copy = [...arr];
+          for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+          }
+          return copy;
+        };
+        for (const item of items) {
+          const subj = item.subject;
+          if (subj === "history" || subj === "ukrainian" || subj === "math") {
+            const q = item.question as Question;
+            if (q.type === "multiple" || q.type === "multiple_correct") {
+              const base = q.options.map((_, i) => i);
+              newOrder[q.id] = shuffle(base);
+            }
+          }
+        }
+        setOptionOrder(newOrder);
         setLoading(false);
       }
     });
@@ -165,44 +224,6 @@ function TestPageContent() {
   const [secondsLeft, setSecondsLeft] = useState(TIME_PER_BLOCK_SEC);
   const [ended, setEnded] = useState(false);
   const [timeUpModalOpen, setTimeUpModalOpen] = useState(false);
-  const [breakSecondsLeft, setBreakSecondsLeft] = useState<number | null | undefined>(block === 2 ? undefined : null);
-
-  useEffect(() => {
-    if (block !== 2) {
-      setBreakSecondsLeft(null);
-      return;
-    }
-    if (typeof window === "undefined") return;
-    const raw = sessionStorage.getItem(BREAK_END_KEY);
-    if (raw) {
-      const endTs = parseInt(raw, 10);
-      if (!Number.isNaN(endTs) && Date.now() < endTs) {
-        setBreakSecondsLeft(Math.max(0, Math.ceil((endTs - Date.now()) / 1000)));
-      } else {
-        sessionStorage.removeItem(BREAK_END_KEY);
-        setBreakSecondsLeft(null);
-      }
-    } else {
-      setBreakSecondsLeft(null);
-    }
-  }, [block]);
-
-  useEffect(() => {
-    if (breakSecondsLeft === null || breakSecondsLeft === undefined || breakSecondsLeft <= 0) return;
-    const t = setInterval(() => {
-      setBreakSecondsLeft((s) => {
-        if (s == null || s === undefined || s <= 1) {
-          if (typeof window !== "undefined") sessionStorage.removeItem(BREAK_END_KEY);
-          return null;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [breakSecondsLeft]);
-
-  const inBreak = block === 2 && typeof breakSecondsLeft === "number" && breakSecondsLeft > 0;
-  const breakNotChecked = block === 2 && breakSecondsLeft === undefined;
 
   useEffect(() => {
     if (ended || timeUpModalOpen) return;
@@ -232,14 +253,12 @@ function TestPageContent() {
 
     if (block === 1) {
       if (typeof window !== "undefined") {
-        const breakEndTime = Date.now() + BREAK_DURATION_SEC * 1000;
-        sessionStorage.setItem(BREAK_END_KEY, String(breakEndTime));
         sessionStorage.setItem(
           BLOCK1_STORAGE,
           JSON.stringify({ subjectScores, answerDetails })
         );
       }
-      router.push(`/test?${new URLSearchParams({ ...baseParams, block: "2" }).toString()}`);
+      setTransitionToBlock2(true);
       return;
     }
 
@@ -294,7 +313,7 @@ function TestPageContent() {
     router.push("/results");
   }, [block, blockItems, answers, name, invitation, grade, router]);
 
-  if (loading || breakNotChecked) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <p className="text-slate-600">Завантаження…</p>
@@ -302,13 +321,10 @@ function TestPageContent() {
     );
   }
 
-  if (inBreak) {
-    const breakM = Math.floor((breakSecondsLeft ?? 0) / 60);
-    const breakS = (breakSecondsLeft ?? 0) % 60;
-    const breakTimeStr = `${breakM}:${breakS.toString().padStart(2, "0")}`;
-    const skipBreak = () => {
-      if (typeof window !== "undefined") sessionStorage.removeItem(BREAK_END_KEY);
-      setBreakSecondsLeft(null);
+  if (transitionToBlock2 && block === 1) {
+    const baseParams = { name, invitation, grade: String(grade) };
+    const goToBlock2 = () => {
+      router.push(`/test?${new URLSearchParams({ ...baseParams, block: "2" }).toString()}`);
     };
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 flex flex-col items-center justify-center p-6 transition-colors duration-300">
@@ -316,22 +332,16 @@ function TestPageContent() {
           <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-indigo-100 flex items-center justify-center">
             <Clock className="w-7 h-7 text-indigo-600" />
           </div>
-          <h2 className="text-2xl font-semibold text-slate-800 mb-2">Перерва</h2>
+          <h2 className="text-2xl font-semibold text-slate-800 mb-3">Блок 1 завершено</h2>
           <p className="text-slate-600 mb-6 leading-relaxed">
-            Під час перерви проходити тестування та здавати тести не можна. До початку блоку 2 залишилось:
-          </p>
-          <p className="font-mono text-4xl font-bold tabular-nums text-indigo-600 mb-2 tracking-tight">
-            {breakTimeStr}
-          </p>
-          <p className="text-sm text-slate-500 mb-8">
-            Після закінчення перерви сторінка оновиться автоматично.
+            Ваші відповіді збережено. Коли будете готові, перейдіть до блоку 2.
           </p>
           <button
             type="button"
-            onClick={skipBreak}
-            className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all duration-200"
+            onClick={goToBlock2}
+            className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
           >
-            Пропустити перерву
+            Перейти до блоку 2
           </button>
         </div>
       </div>
@@ -460,6 +470,7 @@ function TestPageContent() {
                     question={currentQuestion as import("@/types").MultipleChoiceQuestion}
                     value={answers[currentQuestion.id] as number | undefined}
                     onChange={(v) => setAnswer(currentQuestion.id, v)}
+                    order={optionOrder[currentQuestion.id]}
                   />
                 )}
                 {currentQuestion.type === "matching" && (
@@ -481,6 +492,7 @@ function TestPageContent() {
                     question={currentQuestion as MultipleCorrectQuestion}
                     value={answers[currentQuestion.id] as number[] | undefined}
                     onChange={(v) => setAnswer(currentQuestion.id, v)}
+                    order={optionOrder[currentQuestion.id]}
                   />
                 )}
               </>

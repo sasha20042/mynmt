@@ -45,7 +45,7 @@ export function QuestionMatching({ question, value, onChange }: Props) {
         </div>
       )}
       <FormattedText text={question.question} />
-      <div className="space-y-4">
+      <div className="space-y-4 overflow-x-auto">
         {question.pairs.map((pair, i) => (
           <div
             key={i}
@@ -70,7 +70,7 @@ export function QuestionMatching({ question, value, onChange }: Props) {
             {/* Правий варіант: картки (якщо є фото) або випадаючий список */}
             <div className="flex-1 min-w-0">
               {useCardLayout ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 min-w-max">
                   {question.pairs.map((p, j) => {
                     const selected = current[i] === j;
                     return (

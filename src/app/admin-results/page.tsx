@@ -233,6 +233,21 @@ export default function AdminResultsPage() {
                                               {item.questionSnippet
                                                 ? `${item.questionSnippet}${item.questionSnippet.length >= 100 ? "…" : ""}`
                                                 : `Питання ${idx + 1}`}
+                                              {item.userAnswer && (
+                                                <span className="block text-xs text-slate-700">
+                                                  Відповідь учня: {item.userAnswer}
+                                                </span>
+                                              )}
+                                              {item.correctAnswer && (
+                                                <span className="block text-xs text-slate-700">
+                                                  Правильна відповідь: {item.correctAnswer}
+                                                </span>
+                                              )}
+                                              {item.meta && (
+                                                <span className="block text-xs text-slate-500">
+                                                  {item.meta}
+                                                </span>
+                                              )}
                                             </span>
                                           </li>
                                         ))}
