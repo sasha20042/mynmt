@@ -281,16 +281,12 @@ export default function AdminResultsPage() {
                                               {item.questionSnippet
                                                 ? `${item.questionSnippet}${item.questionSnippet.length >= 100 ? "…" : ""}`
                                                 : `Питання ${idx + 1}`}
-                                              {item.userAnswer && (
-                                                <span className="block text-xs text-slate-700">
-                                                  Відповідь учня: {item.userAnswer}
-                                                </span>
-                                              )}
-                                              {item.correctAnswer && (
-                                                <span className="block text-xs text-slate-700">
-                                                  Правильна відповідь: {item.correctAnswer}
-                                                </span>
-                                              )}
+                                              <span className="block text-xs text-slate-700 mt-1">
+                                                Відповідь учня: {item.userAnswer ?? "—"}
+                                              </span>
+                                              <span className="block text-xs text-slate-700">
+                                                Правильна відповідь: {item.correctAnswer ?? "—"}
+                                              </span>
                                               {item.meta && (
                                                 <span className="block text-xs text-slate-500">
                                                   {item.meta}
@@ -380,18 +376,14 @@ export default function AdminResultsPage() {
                     >
                       {flatPreviewList[preview.index].item.correct ? "Відповідь правильна" : "Відповідь неправильна"}
                     </p>
-                    {flatPreviewList[preview.index].item.userAnswer && (
-                      <p className="text-sm text-slate-800">
-                        <span className="font-medium">Відповідь учня:</span>{" "}
-                        {flatPreviewList[preview.index].item.userAnswer}
-                      </p>
-                    )}
-                    {flatPreviewList[preview.index].item.correctAnswer && (
-                      <p className="text-sm text-slate-800">
-                        <span className="font-medium">Правильна відповідь:</span>{" "}
-                        {flatPreviewList[preview.index].item.correctAnswer}
-                      </p>
-                    )}
+                    <p className="text-sm text-slate-800">
+                      <span className="font-medium">Відповідь учня:</span>{" "}
+                      {flatPreviewList[preview.index].item.userAnswer ?? "—"}
+                    </p>
+                    <p className="text-sm text-slate-800">
+                      <span className="font-medium">Правильна відповідь:</span>{" "}
+                      {flatPreviewList[preview.index].item.correctAnswer ?? "—"}
+                    </p>
                     {flatPreviewList[preview.index].item.meta && (
                       <p className="text-xs text-slate-500">{flatPreviewList[preview.index].item.meta}</p>
                     )}
@@ -448,9 +440,44 @@ export default function AdminResultsPage() {
                   <p className="text-sm text-slate-500">Немає даних для статистики.</p>
                 ) : (
                   <div className="space-y-6 text-sm">
-                    <p className="text-slate-700">
-                      Усього робіт: <span className="font-semibold">{filtered.length}</span>
-                    </p>
+                    <div className="flex flex-wrap gap-6 items-baseline">
+                      <p className="text-slate-700">
+                        Усього робіт: <span className="font-semibold text-indigo-700">{filtered.length}</span>
+                      </p>
+                      {grades.map((g) => {
+                        const count = filtered.filter((r) => r.grade === g).length;
+                        if (count === 0) return null;
+                        return (
+                          <p key={g} className="text-slate-600">
+                            {gradeLabels[g]}: <span className="font-medium">{count}</span>
+                          </p>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      <p className="font-medium text-slate-800 mb-2">Розподіл по класах</p>
+                      <div className="flex gap-3 items-end">
+                        {grades.map((g) => {
+                          const count = filtered.filter((r) => r.grade === g).length;
+                          const maxCount = Math.max(1, ...grades.map((gr) => filtered.filter((r) => r.grade === gr).length));
+                          const pct = (count / maxCount) * 100;
+                          return (
+                            <div key={g} className="flex-1 flex flex-col items-center gap-0.5">
+                              <div className="w-full bg-slate-200 rounded-t overflow-hidden flex flex-col justify-end" style={{ height: 48 }}>
+                                <div
+                                  className="w-full bg-indigo-500 rounded-t"
+                                  style={{ height: `${pct}%`, minHeight: count ? 4 : 0 }}
+                                />
+                              </div>
+                              <span className="text-xs text-slate-500">{gradeLabels[g]}</span>
+                              <span className="text-xs font-medium text-slate-700">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {subjectIds.map((s) => {
                         const scores = filtered
@@ -469,10 +496,20 @@ export default function AdminResultsPage() {
                             </div>
                           );
                         }
-                        const avg =
-                          scores.reduce((sum, v) => sum + v, 0) / scores.length;
+                        const sorted = [...scores].sort((a, b) => a - b);
+                        const avg = scores.reduce((sum, v) => sum + v, 0) / scores.length;
                         const max = Math.max(...scores);
                         const min = Math.min(...scores);
+                        const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+                        const passed = scores.filter((v) => v >= 60).length;
+                        const buckets = [0, 0, 0, 0]; // 0-24, 25-49, 50-74, 75-100
+                        for (const v of scores) {
+                          if (v < 25) buckets[0]++;
+                          else if (v < 50) buckets[1]++;
+                          else if (v < 75) buckets[2]++;
+                          else buckets[3]++;
+                        }
+                        const totalB = buckets[0] + buckets[1] + buckets[2] + buckets[3];
                         return (
                           <div
                             key={s}
@@ -481,24 +518,71 @@ export default function AdminResultsPage() {
                             <p className="font-medium text-slate-800 mb-2">
                               {subjectLabels[s]}
                             </p>
-                            <p className="text-slate-700 mb-1">
-                              Середній бал:{" "}
-                              <span className="font-semibold">
-                                {avg.toFixed(1)}%
-                              </span>
-                            </p>
-                            <p className="text-xs text-slate-500 mb-3">
-                              Мінімум: {min}% · Максимум: {max}%
-                            </p>
-                            <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-700 mb-2">
+                              <span>Середній: <span className="font-semibold">{avg.toFixed(1)}%</span></span>
+                              <span>Медіана: <span className="font-semibold">{median}%</span></span>
+                              <span>Мін: {min}%</span>
+                              <span>Макс: {max}%</span>
+                              <span>Здали (≥60%): <span className="font-semibold text-emerald-700">{passed}</span> з {scores.length}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-1">Середній бал</p>
+                            <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden mb-3">
                               <div
-                                className="h-full bg-indigo-500"
+                                className="h-full bg-indigo-500 rounded-full"
                                 style={{ width: `${Math.min(100, Math.max(0, avg))}%` }}
                               />
                             </div>
+                            <p className="text-xs text-slate-500 mb-1">Розподіл: 0–24% · 25–49% · 50–74% · 75–100%</p>
+                            <div className="h-4 w-full flex rounded overflow-hidden">
+                              {[buckets[0], buckets[1], buckets[2], buckets[3]].map((b, i) => {
+                                const widthPct = totalB ? (b / totalB) * 100 : 0;
+                                return (
+                                  <div
+                                    key={i}
+                                    className="h-full"
+                                    style={{
+                                      width: String(widthPct) + "%",
+                                      minWidth: b ? 4 : 0,
+                                      backgroundColor: ["#f87171", "#fbbf24", "#34d399", "#22c55e"][i],
+                                    }}
+                                    title={["0-24%", "25-49%", "50-74%", "75-100%"][i] + ": " + b}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {buckets[0]} · {buckets[1]} · {buckets[2]} · {buckets[3]}
+                            </p>
                           </div>
                         );
                       })}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                      <p className="font-medium text-slate-800 mb-2">Загальний середній бал (усі предмети)</p>
+                      {(() => {
+                        const overall: number[] = [];
+                        for (const r of filtered) {
+                          const subjScores = subjectIds
+                            .map((id) => r.subjects[id]?.score)
+                            .filter((v): v is number => v != null && !Number.isNaN(v));
+                          if (subjScores.length) {
+                            overall.push(subjScores.reduce((a, b) => a + b, 0) / subjScores.length);
+                          }
+                        }
+                        if (!overall.length) return <p className="text-xs text-slate-500">Немає даних</p>;
+                        const avg = overall.reduce((a, b) => a + b, 0) / overall.length;
+                        const sorted = [...overall].sort((a, b) => a - b);
+                        const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+                        return (
+                          <>
+                            <p className="text-slate-700">Середнє: <span className="font-semibold">{avg.toFixed(1)}%</span> · Медіана: <span className="font-semibold">{median.toFixed(1)}%</span></p>
+                            <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden mt-2">
+                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(100, avg)}%` }} />
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

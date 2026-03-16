@@ -136,9 +136,9 @@ function computeAnswerDetails(
       questionId: q.id,
       correct: ok,
       questionSnippet: snippet || undefined,
-      userAnswer: userAnswer || undefined,
-      correctAnswer: correctAnswer || undefined,
-      meta: meta || undefined,
+      userAnswer: userAnswer ?? "(учень не дав відповіді)",
+      correctAnswer: correctAnswer ?? undefined,
+      meta: meta ?? undefined,
     });
   }
   return out as Record<SubjectId, AnswerDetailItem[]>;
