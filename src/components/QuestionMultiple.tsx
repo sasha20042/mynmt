@@ -65,7 +65,7 @@ export function QuestionMultiple({ question, value, onChange, order }: Props) {
                     />
                   </div>
                 )}
-                <span className="text-slate-900">{opt}</span>
+                <FormattedText inline text={opt} className="text-slate-900" />
               </div>
             </label>
           );

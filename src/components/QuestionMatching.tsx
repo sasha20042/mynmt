@@ -69,7 +69,7 @@ export function QuestionMatching({ question, value, onChange, order }: Props) {
                   containerClassName="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 w-full max-w-[200px]"
                 />
               )}
-              <span className="font-medium text-slate-700">{pair.left}</span>
+              <FormattedText inline text={pair.left} className="font-medium text-slate-700" />
             </div>
 
             <span className="text-slate-400 self-center hidden sm:inline">—</span>
@@ -103,9 +103,7 @@ export function QuestionMatching({ question, value, onChange, order }: Props) {
                             />
                           </div>
                         )}
-                        <span className="text-sm font-medium text-slate-800 break-words">
-                          {p.right}
-                        </span>
+                        <FormattedText inline text={p.right} className="text-sm font-medium text-slate-800 break-words" />
                       </button>
                     );
                   })}
@@ -126,7 +124,7 @@ export function QuestionMatching({ question, value, onChange, order }: Props) {
                             : "border-slate-300 bg-white hover:bg-slate-50"
                         }`}
                       >
-                        {p.right}
+                        <FormattedText inline text={p.right} />
                       </button>
                     );
                   })}

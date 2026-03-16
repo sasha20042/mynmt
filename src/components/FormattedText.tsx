@@ -59,6 +59,8 @@ function parseInline(text: string): React.ReactNode[] {
 interface FormattedTextProps {
   text: string;
   className?: string;
+  /** Тільки інлайн-форматування (** * [[), без абзаців — для варіантів відповідей */
+  inline?: boolean;
 }
 
 /** Чи рядок — це повністю [[...]] для центрування */
@@ -79,8 +81,11 @@ function extractCenterContent(line: string): string | null {
  * - [[текст]] — вирівняний по центру (окремий рядок або рядок у параграфі)
  * - Порожній рядок — новий абзац
  */
-export function FormattedText({ text, className = "" }: FormattedTextProps) {
+export function FormattedText({ text, className = "", inline = false }: FormattedTextProps) {
   if (!text || typeof text !== "string") return null;
+  if (inline) {
+    return <span className={className}>{parseInline(text)}</span>;
+  }
   const paragraphs = text.split(/\n\n+/);
   return (
     <div className={`text-slate-800 font-medium mb-4 space-y-3 ${className}`}>

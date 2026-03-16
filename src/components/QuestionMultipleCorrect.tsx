@@ -73,7 +73,7 @@ export function QuestionMultipleCorrect({ question, value, onChange, order }: Pr
                     />
                   </div>
                 )}
-                <span className="text-slate-900">{opt}</span>
+                <FormattedText inline text={opt} className="text-slate-900" />
               </div>
             </label>
           );
