@@ -111,18 +111,26 @@ export function QuestionMatching({ question, value, onChange, order }: Props) {
                   })}
                 </div>
               ) : (
-                <select
-                  value={current[i] >= 0 ? current[i] : ""}
-                  onChange={(e) => setOne(i, Number(e.target.value))}
-                  className="px-3 py-2 rounded-lg border border-slate-300 bg-white w-full max-w-xl text-sm"
-                >
-                  <option value="">Оберіть</option>
-                  {indices.map((originalIndex) => (
-                    <option key={originalIndex} value={originalIndex}>
-                      {question.pairs[originalIndex].right}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  {indices.map((originalIndex, j) => {
+                    const p = question.pairs[originalIndex];
+                    const selected = current[i] === originalIndex;
+                    return (
+                      <button
+                        key={originalIndex}
+                        type="button"
+                        onClick={() => setOne(i, j)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm whitespace-normal break-words ${
+                          selected
+                            ? "border-indigo-500 bg-indigo-50 text-slate-900"
+                            : "border-slate-300 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        {p.right}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>

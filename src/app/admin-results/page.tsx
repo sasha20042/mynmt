@@ -13,6 +13,12 @@ export default function AdminResultsPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [gradeFilter, setGradeFilter] = useState<Grade | "all">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    result: TestResult;
+    subject: SubjectId | "all";
+    index: number;
+  } | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const loadResults = useCallback(() => {
     getStoredResults().then(setResults);
@@ -26,6 +32,22 @@ export default function AdminResultsPage() {
     if (gradeFilter === "all") return results;
     return results.filter((r) => r.grade === gradeFilter);
   }, [results, gradeFilter]);
+
+  const flatPreviewList = useMemo(() => {
+    if (!preview) return [];
+    const r = preview.result;
+    const subjectsForPreview =
+      preview.subject === "all" ? subjectIds : [preview.subject];
+    const items: { subject: SubjectId; item: NonNullable<TestResult["answerDetails"]>[SubjectId][number] }[] = [];
+    if (!r.answerDetails) return items;
+    for (const s of subjectsForPreview) {
+      const list = r.answerDetails[s] ?? [];
+      for (const it of list) {
+        items.push({ subject: s, item: it });
+      }
+    }
+    return items;
+  }, [preview]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Видалити цей запис?")) return;
@@ -105,14 +127,23 @@ export default function AdminResultsPage() {
               ))}
             </select>
           </div>
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-sm"
-          >
-            <Trash2 className="w-4 h-4" />
-            Очистити всі
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStatsOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
+            >
+              Статистика
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-sm"
+            >
+              <Trash2 className="w-4 h-4" />
+              Очистити всі
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -178,6 +209,23 @@ export default function AdminResultsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                            {r.answerDetails && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreview({
+                                    result: r,
+                                    subject: "all",
+                                    index: 0,
+                                  })
+                                }
+                                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Переглянути роботу учня"
+                                title="Переглянути роботу учня"
+                              >
+                                Перегляд
+                              </button>
+                            )}
                             {r.answerDetails && (
                               <button
                                 type="button"
@@ -267,6 +315,197 @@ export default function AdminResultsPage() {
             </div>
           )}
         </div>
+
+        {preview && flatPreviewList.length > 0 && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">
+                    Робота учня: {preview.result.name} · Запрошення {preview.result.invitation}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {gradeLabels[preview.result.grade]} · {formatDate(preview.result.date)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreview(null)}
+                  className="text-slate-400 hover:text-slate-700 text-sm"
+                >
+                  Закрити
+                </button>
+              </div>
+              <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-3 text-sm">
+                <span className="text-slate-600">Предмет:</span>
+                <select
+                  value={preview.subject}
+                  onChange={(e) =>
+                    setPreview((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            subject: e.target.value === "all" ? "all" : (e.target.value as SubjectId),
+                            index: 0,
+                          }
+                        : prev
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm"
+                >
+                  <option value="all">Усі</option>
+                  {subjectIds.map((s) => (
+                    <option key={s} value={s}>
+                      {subjectLabels[s]}
+                    </option>
+                  ))}
+                </select>
+                <span className="ml-auto text-slate-500">
+                  Питання {Math.min(preview.index + 1, flatPreviewList.length)} з {flatPreviewList.length}
+                </span>
+              </div>
+              <div className="px-6 py-4 flex-1 overflow-auto">
+                {flatPreviewList[preview.index] && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium text-indigo-700">
+                      {subjectLabels[flatPreviewList[preview.index].subject]}
+                    </p>
+                    <p className="text-sm font-medium text-slate-800">
+                      {flatPreviewList[preview.index].item.questionSnippet ?? "Питання"}
+                    </p>
+                    <p
+                      className={`text-sm ${
+                        flatPreviewList[preview.index].item.correct ? "text-emerald-700" : "text-red-700"
+                      }`}
+                    >
+                      {flatPreviewList[preview.index].item.correct ? "Відповідь правильна" : "Відповідь неправильна"}
+                    </p>
+                    {flatPreviewList[preview.index].item.userAnswer && (
+                      <p className="text-sm text-slate-800">
+                        <span className="font-medium">Відповідь учня:</span>{" "}
+                        {flatPreviewList[preview.index].item.userAnswer}
+                      </p>
+                    )}
+                    {flatPreviewList[preview.index].item.correctAnswer && (
+                      <p className="text-sm text-slate-800">
+                        <span className="font-medium">Правильна відповідь:</span>{" "}
+                        {flatPreviewList[preview.index].item.correctAnswer}
+                      </p>
+                    )}
+                    {flatPreviewList[preview.index].item.meta && (
+                      <p className="text-xs text-slate-500">{flatPreviewList[preview.index].item.meta}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPreview((prev) =>
+                      prev ? { ...prev, index: Math.max(0, prev.index - 1) } : prev
+                    )
+                  }
+                  disabled={preview.index === 0}
+                  className="text-slate-600 disabled:opacity-50 hover:text-slate-800"
+                >
+                  Попереднє
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPreview((prev) =>
+                      prev
+                        ? { ...prev, index: Math.min(flatPreviewList.length - 1, prev.index + 1) }
+                        : prev
+                    )
+                  }
+                  disabled={preview.index >= flatPreviewList.length - 1}
+                  className="text-slate-600 disabled:opacity-50 hover:text-slate-800"
+                >
+                  Наступне
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {statsOpen && (
+          <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-800">Статистика по результатах</p>
+                <button
+                  type="button"
+                  onClick={() => setStatsOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 text-sm"
+                >
+                  Закрити
+                </button>
+              </div>
+              <div className="px-6 py-4 flex-1 overflow-auto">
+                {filtered.length === 0 ? (
+                  <p className="text-sm text-slate-500">Немає даних для статистики.</p>
+                ) : (
+                  <div className="space-y-6 text-sm">
+                    <p className="text-slate-700">
+                      Усього робіт: <span className="font-semibold">{filtered.length}</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {subjectIds.map((s) => {
+                        const scores = filtered
+                          .map((r) => r.subjects[s]?.score ?? null)
+                          .filter((v): v is number => v !== null && !Number.isNaN(v));
+                        if (!scores.length) {
+                          return (
+                            <div
+                              key={s}
+                              className="rounded-xl border border-slate-200 p-4 bg-slate-50/60"
+                            >
+                              <p className="font-medium text-slate-800 mb-1">
+                                {subjectLabels[s]}
+                              </p>
+                              <p className="text-xs text-slate-500">Немає даних</p>
+                            </div>
+                          );
+                        }
+                        const avg =
+                          scores.reduce((sum, v) => sum + v, 0) / scores.length;
+                        const max = Math.max(...scores);
+                        const min = Math.min(...scores);
+                        return (
+                          <div
+                            key={s}
+                            className="rounded-xl border border-slate-200 p-4 bg-slate-50/60"
+                          >
+                            <p className="font-medium text-slate-800 mb-2">
+                              {subjectLabels[s]}
+                            </p>
+                            <p className="text-slate-700 mb-1">
+                              Середній бал:{" "}
+                              <span className="font-semibold">
+                                {avg.toFixed(1)}%
+                              </span>
+                            </p>
+                            <p className="text-xs text-slate-500 mb-3">
+                              Мінімум: {min}% · Максимум: {max}%
+                            </p>
+                            <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden">
+                              <div
+                                className="h-full bg-indigo-500"
+                                style={{ width: `${Math.min(100, Math.max(0, avg))}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
