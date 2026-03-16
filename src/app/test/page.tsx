@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
-import { subjectLabels, gradeLabels, TIME_PER_SUBJECT_SEC, BREAK_DURATION_SEC, blockSubjects } from "@/constants/questions";
+import { subjectLabels, gradeLabels, TIME_PER_BLOCK_SEC, BREAK_DURATION_SEC, blockSubjects } from "@/constants/questions";
 import type { Grade, SubjectId, AnswerState, AnswerDetailItem, Question, ShortAnswerQuestion, MultipleCorrectQuestion } from "@/types";
 import { QuestionMultiple } from "@/components/QuestionMultiple";
 import { QuestionMatching } from "@/components/QuestionMatching";
@@ -115,26 +115,8 @@ function TestPageContent() {
 
   const [blockItems, setBlockItems] = useState<{ subject: SubjectId; question: import("@/types").Question; index: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentSubjectIndex, setCurrentSubjectIndex] = useState(0);
-  const [accumulatedBlockScores, setAccumulatedBlockScores] = useState<Record<SubjectId, { correct: number; total: number }>>({
-    ukrainian: { correct: 0, total: 0 },
-    math: { correct: 0, total: 0 },
-    history: { correct: 0, total: 0 },
-    english: { correct: 0, total: 0 },
-  });
-  const [accumulatedBlockDetails, setAccumulatedBlockDetails] = useState<Record<SubjectId, AnswerDetailItem[]>>({
-    ukrainian: [],
-    math: [],
-    history: [],
-    english: [],
-  });
   const subjectsInBlock = block === 1 ? blockSubjects[1] : blockSubjects[2];
-  const currentSubject = subjectsInBlock[currentSubjectIndex];
-  const currentSubjectItems = useMemo(
-    () => blockItems.filter((x) => x.subject === currentSubject),
-    [blockItems, currentSubject]
-  );
-  const questionList = useMemo(() => currentSubjectItems.map((x) => x.question), [currentSubjectItems]);
+  const questionList = useMemo(() => blockItems.map((x) => x.question), [blockItems]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,10 +145,13 @@ function TestPageContent() {
             english: { correct: 0, total: 0 },
             ...(parsed && "subjectScores" in parsed ? parsed.subjectScores : parsed),
           };
-          const payload: Record<string, unknown> = { name, invitation, grade, subjects: allScores };
-          if (parsed && "answerDetails" in parsed && parsed.answerDetails) {
-            payload.answerDetails = parsed.answerDetails;
-          }
+          const emptyDetails: Record<SubjectId, AnswerDetailItem[]> = {
+            ukrainian: [], math: [], history: [], english: [],
+          };
+          const allDetails = parsed && "answerDetails" in parsed && parsed.answerDetails
+            ? { ...emptyDetails, ...parsed.answerDetails }
+            : emptyDetails;
+          const payload: Record<string, unknown> = { name, invitation, grade, subjects: allScores, answerDetails: allDetails };
           sessionStorage.setItem("nmt_final_scores", JSON.stringify(payload));
           sessionStorage.removeItem(BLOCK1_STORAGE);
           router.replace("/results");
@@ -177,16 +162,9 @@ function TestPageContent() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerState["value"]>>({});
-  const [secondsLeft, setSecondsLeft] = useState(TIME_PER_SUBJECT_SEC);
+  const [secondsLeft, setSecondsLeft] = useState(TIME_PER_BLOCK_SEC);
   const [ended, setEnded] = useState(false);
   const [timeUpModalOpen, setTimeUpModalOpen] = useState(false);
-
-  useEffect(() => {
-    setSecondsLeft(TIME_PER_SUBJECT_SEC);
-    setEnded(false);
-    setTimeUpModalOpen(false);
-    setCurrentIndex(0);
-  }, [currentSubjectIndex]);
   const [breakSecondsLeft, setBreakSecondsLeft] = useState<number | null | undefined>(block === 2 ? undefined : null);
 
   useEffect(() => {
@@ -245,32 +223,12 @@ function TestPageContent() {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
-  const finishCurrentSubject = useCallback(() => {
-    const itemsForSubject = currentSubjectItems.map((x) => ({ subject: x.subject, question: x.question }));
-    const subjectScores = computeSubjectScores(itemsForSubject, answers);
-    const blockDetails = computeAnswerDetails(itemsForSubject, answers);
-
-    const nextAccumulatedScores = { ...accumulatedBlockScores, ...subjectScores };
-    const nextAccumulatedDetails: Record<SubjectId, AnswerDetailItem[]> = {
-      ukrainian: [...(accumulatedBlockDetails.ukrainian ?? []), ...(blockDetails.ukrainian ?? [])],
-      math: [...(accumulatedBlockDetails.math ?? []), ...(blockDetails.math ?? [])],
-      history: [...(accumulatedBlockDetails.history ?? []), ...(blockDetails.history ?? [])],
-      english: [...(accumulatedBlockDetails.english ?? []), ...(blockDetails.english ?? [])],
-    };
-
-    const isLastSubject = currentSubjectIndex >= subjectsInBlock.length - 1;
-
-    if (!isLastSubject) {
-      setAccumulatedBlockScores(nextAccumulatedScores);
-      setAccumulatedBlockDetails(nextAccumulatedDetails);
-      setCurrentSubjectIndex((i) => i + 1);
-      setTimeUpModalOpen(false);
-      return;
-    }
+  const finishBlock = useCallback(() => {
+    const items = blockItems.map((x) => ({ subject: x.subject, question: x.question }));
+    const subjectScores = computeSubjectScores(items, answers);
+    const answerDetails = computeAnswerDetails(items, answers);
 
     const baseParams = { name, invitation, grade: String(grade) };
-    const finalScores = nextAccumulatedScores;
-    const finalDetails = nextAccumulatedDetails;
 
     if (block === 1) {
       if (typeof window !== "undefined") {
@@ -278,7 +236,7 @@ function TestPageContent() {
         sessionStorage.setItem(BREAK_END_KEY, String(breakEndTime));
         sessionStorage.setItem(
           BLOCK1_STORAGE,
-          JSON.stringify({ subjectScores: finalScores, answerDetails: finalDetails })
+          JSON.stringify({ subjectScores, answerDetails })
         );
       }
       router.push(`/test?${new URLSearchParams({ ...baseParams, block: "2" }).toString()}`);
@@ -315,13 +273,13 @@ function TestPageContent() {
     }
     const allScores: Record<SubjectId, { correct: number; total: number }> = {
       ...block1Scores,
-      ...finalScores,
+      ...subjectScores,
     };
     const allDetails: Record<SubjectId, AnswerDetailItem[]> = {
-      ukrainian: [...(block1Details.ukrainian ?? []), ...(finalDetails.ukrainian ?? [])],
-      math: [...(block1Details.math ?? []), ...(finalDetails.math ?? [])],
-      history: [...(block1Details.history ?? []), ...(finalDetails.history ?? [])],
-      english: [...(block1Details.english ?? []), ...(finalDetails.english ?? [])],
+      ukrainian: [...(block1Details.ukrainian ?? []), ...(answerDetails.ukrainian ?? [])],
+      math: [...(block1Details.math ?? []), ...(answerDetails.math ?? [])],
+      history: [...(block1Details.history ?? []), ...(answerDetails.history ?? [])],
+      english: [...(block1Details.english ?? []), ...(answerDetails.english ?? [])],
     };
     if (typeof window !== "undefined") {
       sessionStorage.setItem("nmt_final_scores", JSON.stringify({
@@ -334,19 +292,7 @@ function TestPageContent() {
       sessionStorage.removeItem(BLOCK1_STORAGE);
     }
     router.push("/results");
-  }, [
-    block,
-    currentSubjectIndex,
-    currentSubjectItems,
-    answers,
-    accumulatedBlockScores,
-    accumulatedBlockDetails,
-    subjectsInBlock.length,
-    name,
-    invitation,
-    grade,
-    router,
-  ]);
+  }, [block, blockItems, answers, name, invitation, grade, router]);
 
   if (loading || breakNotChecked) {
     return (
@@ -397,16 +343,18 @@ function TestPageContent() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center max-w-sm">
           <p className="text-slate-600 mb-4">
-            Питання для предмету «{subjectLabels[currentSubject]}» ще не додано.
+            Питання для цього блоку ще не додано.
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <button
-              type="button"
-              onClick={finishCurrentSubject}
-              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
-            >
-              Здати й перейти далі
-            </button>
+            {(block === 1 || block === 2) && (
+              <button
+                type="button"
+                onClick={finishBlock}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+              >
+                {block === 1 ? "Здати блок 1" : "Здати тест"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => router.push("/")}
@@ -431,8 +379,9 @@ function TestPageContent() {
   };
 
   const currentQuestion = questionList[currentIndex];
+  const currentItem = blockItems[currentIndex];
   const answeredCount = Object.keys(answers).filter((id) =>
-    currentSubjectItems.some((x) => x.question.id === id)
+    blockItems.some((x) => x.question.id === id)
   ).length;
 
   return (
@@ -441,7 +390,7 @@ function TestPageContent() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-4">
             <span className="font-medium text-slate-800">
-              Блок {block} — {subjectLabels[currentSubject]} (1 год)
+              Блок {block} — {subjectsInBlock.map((s) => subjectLabels[s]).join(", ")} (2 год)
             </span>
             <span className="text-slate-500 text-sm">{gradeLabels[grade]}</span>
           </div>
@@ -456,15 +405,11 @@ function TestPageContent() {
             </div>
             <button
               type="button"
-              onClick={finishCurrentSubject}
+              onClick={finishBlock}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
             >
               <Send className="w-4 h-4" />
-              {currentSubjectIndex < subjectsInBlock.length - 1
-                ? `Здати ${subjectLabels[currentSubject]}`
-                : block === 1
-                  ? "Здати блок 1"
-                  : "Здати тест"}
+              {block === 1 ? "Здати блок 1" : "Здати тест"}
             </button>
           </div>
         </div>
@@ -500,9 +445,9 @@ function TestPageContent() {
 
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-            {currentSubject && (
+            {currentItem && (
               <p className="text-xs text-indigo-700 font-medium mb-1">
-                {subjectLabels[currentSubject]}
+                {subjectLabels[currentItem.subject]}
               </p>
             )}
             {currentQuestion && (
@@ -563,15 +508,11 @@ function TestPageContent() {
               ) : (
                 <button
                   type="button"
-                  onClick={finishCurrentSubject}
+                  onClick={finishBlock}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium border border-indigo-700 shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
                 >
                   <Send className="w-4 h-4" />
-                  {currentSubjectIndex < subjectsInBlock.length - 1
-                    ? `Здати ${subjectLabels[currentSubject]} і перейти до наступного предмету`
-                    : block === 1
-                      ? "Завершити блок 1 і перейти до блоку 2"
-                      : "Завершити тест"}
+                  {block === 1 ? "Здати блок 1" : "Здати тест"}
                 </button>
               )}
             </div>
@@ -606,7 +547,7 @@ function TestPageContent() {
               type="button"
               onClick={() => {
                 setTimeUpModalOpen(false);
-                finishCurrentSubject();
+                finishBlock();
               }}
               className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
             >

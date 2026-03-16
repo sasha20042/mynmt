@@ -209,32 +209,35 @@ export default function AdminResultsPage() {
                           <td colSpan={subjectIds.length + 4} className="px-4 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                               {subjectIds.map((s) => {
-                                const list = r.answerDetails![s];
-                                if (!list?.length) return null;
+                                const list = r.answerDetails?.[s] ?? [];
                                 return (
                                   <div key={s} className="bg-white rounded-lg border border-slate-200 p-3">
                                     <p className="font-medium text-slate-700 mb-2">
                                       {subjectLabels[s]}
                                     </p>
-                                    <ul className="space-y-1.5">
-                                      {list.map((item, idx) => (
-                                        <li
-                                          key={`${item.questionId}-${idx}`}
-                                          className={`flex items-start gap-2 ${item.correct ? "text-emerald-700" : "text-red-700"}`}
-                                        >
-                                          {item.correct ? (
-                                            <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                          ) : (
-                                            <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                          )}
-                                          <span className="break-words">
-                                            {item.questionSnippet
-                                              ? `${item.questionSnippet}${item.questionSnippet.length >= 100 ? "…" : ""}`
-                                              : `Питання ${idx + 1}`}
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
+                                    {list.length === 0 ? (
+                                      <p className="text-slate-500 text-xs">Немає питань</p>
+                                    ) : (
+                                      <ul className="space-y-1.5">
+                                        {list.map((item, idx) => (
+                                          <li
+                                            key={`${item.questionId}-${idx}`}
+                                            className={`flex items-start gap-2 ${item.correct ? "text-emerald-700" : "text-red-700"}`}
+                                          >
+                                            {item.correct ? (
+                                              <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            ) : (
+                                              <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            )}
+                                            <span className="break-words">
+                                              {item.questionSnippet
+                                                ? `${item.questionSnippet}${item.questionSnippet.length >= 100 ? "…" : ""}`
+                                                : `Питання ${idx + 1}`}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
                                   </div>
                                 );
                               })}
