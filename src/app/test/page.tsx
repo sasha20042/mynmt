@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Clock, ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { getQuestionsForBlock } from "@/lib/questionsStorage";
@@ -201,7 +201,7 @@ function TestPageContent() {
   }, [grade, block]);
 
   useEffect(() => {
-    if (block === 2 && blockItems.length === 0 && typeof window !== "undefined") {
+    if (block === 2 && !loading && blockItems.length === 0 && typeof window !== "undefined") {
       try {
         const raw = sessionStorage.getItem(BLOCK1_STORAGE);
         if (raw) {
@@ -228,9 +228,10 @@ function TestPageContent() {
         }
       } catch {}
     }
-  }, [block, blockItems.length, name, invitation, grade, router]);
+  }, [block, loading, blockItems.length, name, invitation, grade, router]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const questionContentRef = useRef<HTMLDivElement>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerState["value"]>>({});
   const [secondsLeft, setSecondsLeft] = useState(TIME_PER_BLOCK_SEC);
   const [ended, setEnded] = useState(false);
@@ -250,6 +251,10 @@ function TestPageContent() {
     }, 1000);
     return () => clearInterval(t);
   }, [ended, timeUpModalOpen]);
+
+  useEffect(() => {
+    questionContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [currentIndex]);
 
   const setAnswer = useCallback((questionId: string, value: AnswerState["value"]) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
@@ -465,14 +470,14 @@ function TestPageContent() {
         </aside>
 
         <div className="flex-1 min-w-0">
-          <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div ref={questionContentRef} className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
             {currentItem && (
               <p className="text-xs text-indigo-700 font-medium mb-1">
                 {subjectLabels[currentItem.subject]}
               </p>
             )}
             {currentQuestion && (
-              <>
+              <div key={currentQuestion.id}>
                 <p className="text-sm font-medium text-slate-700 mb-2">
                   Питання {currentIndex + 1} з {questionList.length}
                 </p>
@@ -507,7 +512,7 @@ function TestPageContent() {
                     order={optionOrder[currentQuestion.id]}
                   />
                 )}
-              </>
+              </div>
             )}
 
             <div className="mt-8 flex items-center justify-between gap-4">
