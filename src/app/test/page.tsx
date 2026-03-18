@@ -238,6 +238,13 @@ function TestPageContent() {
   const [timeUpModalOpen, setTimeUpModalOpen] = useState(false);
 
   useEffect(() => {
+    if (block === 2) {
+      setSecondsLeft(TIME_PER_BLOCK_SEC);
+      setTimeUpModalOpen(false);
+    }
+  }, [block]);
+
+  useEffect(() => {
     if (ended || timeUpModalOpen) return;
     const t = setInterval(() => {
       setSecondsLeft((s) => {
@@ -572,16 +579,28 @@ function TestPageContent() {
             <p className="text-lg font-medium text-slate-800 mb-6 leading-relaxed">
               Час закінчився. Поточні відповіді зараховано.
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setTimeUpModalOpen(false);
-                finishBlock();
-              }}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
-            >
-              OK
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeUpModalOpen(false);
+                  finishBlock();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98]"
+              >
+                Здати і продовжити
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeUpModalOpen(false);
+                  setSecondsLeft(TIME_PER_BLOCK_SEC);
+                }}
+                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-all duration-200 active:scale-[0.98]"
+              >
+                Додати час 2 години
+              </button>
+            </div>
           </div>
         </div>
       )}
