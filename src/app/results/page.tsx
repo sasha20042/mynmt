@@ -158,7 +158,8 @@ export default function ResultsPage() {
         const pdfMakeMod = await import("pdfmake/build/pdfmake");
         const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
         const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
-        pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+      // pdfmake/build/vfs_fonts exports font file contents keyed by filename
+      pdfMake.vfs = (pdfFontsMod as any).pdfMake?.vfs ?? (pdfFontsMod as any).vfs ?? pdfFontsMod;
 
         const pdfDocDefinition: any = {
           content: [
