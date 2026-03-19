@@ -85,7 +85,7 @@ export default function AdminResultsPage() {
       .replace(/\s+/g, "_")
       .slice(0, 80);
 
-  const handleSnapshot = async () => {
+  const handleExcelSnapshot = async () => {
     if (exporting) return;
     if (!filtered.length) return;
 
@@ -159,97 +159,172 @@ export default function AdminResultsPage() {
       excelLink.download = `${fileBase}.xlsx`;
       excelLink.click();
       setTimeout(() => URL.revokeObjectURL(excelUrl), 500);
+    } finally {
+      setExporting(false);
+    }
+  };
 
-      try {
-        // PDF (pdfmake)
-        const pdfMakeMod = await import("pdfmake/build/pdfmake");
-        const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
-        const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
-        pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+  const handlePdfSnapshot = async () => {
+    if (exporting) return;
+    if (!filtered.length) return;
 
-        const pdfDocDefinition: any = {
-          content: [
-            { text: "Результати тестувань", style: "title" },
-            {
-              text:
-                gradeFilter === "all"
-                  ? "Всі класи"
-                  : `Клас: ${gradeLabels[gradeFilter as Grade]}`,
-              style: "subtitle",
-            },
-            { text: `Сформовано: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
-            { text: " ", margin: [0, 12, 0, 8] },
-            { text: "Зведення по учнях", style: "sectionTitle" },
-            {
-              table: {
-                headerRows: 1,
-                widths: ["*", "auto", "auto", "auto", "auto", "auto"],
-                body: [
-                  [
-                    { text: "ПІБ", style: "tableHeader" },
-                    { text: "Клас", style: "tableHeader" },
-                    { text: "Дата", style: "tableHeader" },
-                    { text: subjectLabels["ukrainian"], style: "tableHeader" },
-                    { text: subjectLabels["math"], style: "tableHeader" },
-                    { text: subjectLabels["history"], style: "tableHeader" },
-                    // NOTE: english column omitted due to compact widths
-                  ],
-                  ...filtered.map((r) => {
-                    const u = r.subjects.ukrainian;
-                    const m = r.subjects.math;
-                    const h = r.subjects.history;
-                    return [
-                      { text: r.name, style: "tableCell" },
-                      { text: gradeLabels[r.grade], style: "tableCell" },
-                      { text: formatDate(r.date), style: "tableCell" },
-                      {
-                        text: `${u.correct}/${u.total} (${
-                          u.total ? Math.round((u.correct / u.total) * 100) : 0
-                        }%)`,
-                        style: "tableCell",
-                      },
-                      {
-                        text: `${m.correct}/${m.total} (${
-                          m.total ? Math.round((m.correct / m.total) * 100) : 0
-                        }%)`,
-                        style: "tableCell",
-                      },
-                      {
-                        text: `${h.correct}/${h.total} (${
-                          h.total ? Math.round((h.correct / h.total) * 100) : 0
-                        }%)`,
-                        style: "tableCell",
-                      },
-                    ];
-                  }),
-                ],
-              },
-              layout: {
-                fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
-              },
-            },
-          ],
-          styles: {
-            title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
-            subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
-            meta: { fontSize: 9, color: "#6B7280" },
-            sectionTitle: { fontSize: 12, bold: true, color: "#111827", margin: [0, 0, 0, 6] },
-            tableHeader: { fontSize: 9, bold: true, color: "#111827" },
-            tableCell: { fontSize: 8, color: "#111827" },
-          },
-          defaultStyle: {
-            font: "Roboto",
-          },
-          pageSize: "A4",
-          pageMargins: [28, 50, 28, 45],
+    setExporting(true);
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const fileBase = sanitizeFileName(
+        `results_${gradeFilter === "all" ? "all" : gradeFilter}_pdf_${dateStr}`
+      );
+
+      const pdfMakeMod = await import("pdfmake/build/pdfmake");
+      const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
+      const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
+      pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+
+      const gradeTitle =
+        gradeFilter === "all"
+          ? "Всі класи"
+          : `Клас: ${gradeLabels[gradeFilter as Grade]}`;
+
+      const content: any[] = [
+        { text: "Результати тестувань", style: "title" },
+        { text: gradeTitle, style: "subtitle" },
+        { text: `Сформовано: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
+        { text: " ", margin: [0, 12, 0, 8] },
+      ];
+
+      for (let rIndex = 0; rIndex < filtered.length; rIndex++) {
+        const r = filtered[rIndex];
+        const answerDetails =
+          r.answerDetails ?? ({} as NonNullable<TestResult["answerDetails"]>);
+
+        const studentHeader = {
+          text: `${rIndex + 1}. ${r.name}`,
+          style: "studentHeader",
+          margin: [0, 14, 0, 6],
         };
 
-        const pdfName = `${fileBase}.pdf`;
-        pdfMake.createPdf(pdfDocDefinition).download(pdfName);
-      } catch (err) {
-        console.error("PDF export failed:", err);
-        alert("Excel сформувався, але PDF не вийшов. Перевірте консоль (F12).");
+        content.push(studentHeader);
+        content.push({
+          text: `Запрошення: ${r.invitation} · Клас: ${gradeLabels[r.grade]} · Дата: ${formatDate(
+            r.date
+          )}`,
+          style: "meta",
+          margin: [0, 0, 0, 10],
+        });
+
+        // Subject summary table
+        content.push({ text: "Зведення по предметах", style: "sectionTitle" });
+        content.push({
+          table: {
+            headerRows: 1,
+            widths: ["*", "auto", "auto"],
+            body: [
+              [
+                { text: "Предмет", style: "tableHeader" },
+                { text: "Набрано", style: "tableHeader" },
+                { text: "%", style: "tableHeader" },
+              ],
+              ...subjectIds.map((subjId) => {
+                const subj = r.subjects[subjId];
+                const percent = subj.total ? Math.round((subj.correct / subj.total) * 100) : 0;
+                return [
+                  { text: subjectLabels[subjId], style: "tableCell" },
+                  { text: `${subj.correct}/${subj.total}`, style: "tableCell" },
+                  { text: `${percent}%`, style: "tableCell" },
+                ];
+              }),
+            ],
+          },
+          layout: {
+            fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+          },
+        });
+
+        // Works by subject
+        for (const subjId of subjectIds) {
+          const items = answerDetails[subjId] ?? [];
+          content.push({
+            text: subjectLabels[subjId],
+            style: "subsectionTitle",
+            margin: [0, 10, 0, 4],
+          });
+
+          if (!items.length) {
+            content.push({ text: "Немає збережених відповідей.", style: "meta" });
+            continue;
+          }
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const qText = item.questionSnippet
+              ? item.questionSnippet
+              : `Питання ${i + 1}`;
+            const userAns = item.userAnswer ?? "—";
+            const correctAns = item.correctAnswer ?? "—";
+            const isCorrect = Boolean(item.correct);
+
+            const stackItems: any[] = [
+              { text: `${i + 1}. ${qText}`, style: "itemQuestion" },
+              {
+                text: `Відповідь учня: ${userAns}`,
+                style: isCorrect ? "correctAnswerText" : "wrongAnswerText",
+              },
+              { text: `Правильна відповідь: ${correctAns}`, style: "correctAnswerText" },
+            ];
+            if (item.meta) {
+              stackItems.push({ text: item.meta, style: "metaSmall" });
+            }
+
+            content.push({
+              table: {
+                widths: ["*"],
+                body: [
+                  [
+                    {
+                      fillColor: isCorrect ? "#ECFDF5" : "#FEF2F2",
+                      stack: stackItems,
+                      margin: [0, 6, 0, 6],
+                    },
+                  ],
+                ],
+              },
+              layout: { hLineWidth: () => 0, vLineWidth: () => 0 },
+            });
+          }
+        }
+
+        if (rIndex < filtered.length - 1) {
+          content.push({ text: " ", pageBreak: "after" });
+        }
       }
+
+      const pdfDocDefinition: any = {
+        content,
+        styles: {
+          title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
+          subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
+          meta: { fontSize: 9, color: "#6B7280" },
+          metaSmall: { fontSize: 8, color: "#6B7280" },
+          studentHeader: { fontSize: 12, bold: true, color: "#111827" },
+          sectionTitle: { fontSize: 10.5, bold: true, color: "#111827", margin: [0, 6, 0, 6] },
+          subsectionTitle: { fontSize: 10, bold: true, color: "#0F172A" },
+          tableHeader: { fontSize: 9, bold: true, color: "#111827" },
+          tableCell: { fontSize: 8, color: "#111827" },
+          itemQuestion: { fontSize: 8.5, bold: true, color: "#111827", lineHeight: 1.2 },
+          correctAnswerText: { fontSize: 8.5, color: "#047857" },
+          wrongAnswerText: { fontSize: 8.5, color: "#DC2626" },
+        },
+        defaultStyle: {
+          font: "Roboto",
+        },
+        pageSize: "A4",
+        pageMargins: [28, 50, 28, 45],
+      };
+
+      pdfMake.createPdf(pdfDocDefinition).download(`${fileBase}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("PDF не вийшов. Перевірте консоль (F12).");
     } finally {
       setExporting(false);
     }
@@ -320,11 +395,22 @@ export default function AdminResultsPage() {
               disabled={exporting}
               onClick={() => {
                 // Export can be slow; we generate on the client and download files.
-                void handleSnapshot();
+                void handleExcelSnapshot();
               }}
               className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-60"
             >
               Зліпок
+            </button>
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={() => {
+                void handlePdfSnapshot();
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-60"
+              title="Завантажити PDF з роботами учнів"
+            >
+              PDF
             </button>
             <button
               type="button"
