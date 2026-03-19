@@ -113,11 +113,13 @@ export default function ResultsPage() {
                     <p className="font-medium text-slate-800">{s.label}</p>
                     <p className="text-sm text-slate-500">
                       <CheckCircle className="w-4 h-4 text-emerald-500 inline mr-1" />
-                      Набрано {s.correct} з {s.total} балів
+                      Набрано {s.correct}/{s.total} балів
                     </p>
                   </div>
                 </div>
-                <span className="text-xl font-bold text-indigo-700">{s.score}%</span>
+                <span className="text-xl font-bold text-indigo-700">
+                  {s.correct}/{s.total} <span className="text-base text-indigo-700/70 font-semibold">({s.score}%)</span>
+                </span>
               </div>
             ))}
           </div>

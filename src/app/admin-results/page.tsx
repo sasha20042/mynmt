@@ -197,13 +197,15 @@ export default function AdminResultsPage() {
                         </td>
                         {subjectIds.map((s) => (
                           <td key={s} className="px-4 py-3 text-slate-600">
-                            {r.subjects[s]?.total != null ? (
-                              <span className="font-medium text-indigo-700">
-                                {r.subjects[s].score}%
-                              </span>
-                            ) : (
-                              "—"
-                            )}
+                            {(() => {
+                              const subj = r.subjects[s];
+                              if (subj?.total == null) return "—";
+                              return (
+                                <span className="font-medium text-indigo-700">
+                                  {subj.correct}/{subj.total} ({subj.score}%)
+                                </span>
+                              );
+                            })()}
                           </td>
                         ))}
                         <td className="px-4 py-3 text-slate-500 text-sm">
