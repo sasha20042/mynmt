@@ -25,6 +25,7 @@ const defaultScores: Record<SubjectId, { correct: number; total: number }> = {
 export default function ResultsPage() {
   const router = useRouter();
   const [data, setData] = useState<FinalScores | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -85,6 +86,173 @@ export default function ResultsPage() {
         Math.round((data.subjects[id].correct / data.subjects[id].total) * 100) : 0,
   }));
 
+  const sanitizeFileName = (value: string) =>
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .replace(/\s+/g, "_")
+      .slice(0, 60);
+
+  const handleSnapshot = async () => {
+    if (!data || exporting) return;
+    setExporting(true);
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const fileBase = sanitizeFileName(`${data.name}_${data.grade}_${dateStr}`);
+
+      // Excel (SheetJS)
+      const xlsxMod = await import("xlsx");
+      const xlsx = xlsxMod.default ?? xlsxMod;
+
+      const subjectRows = (Object.keys(defaultScores) as SubjectId[]).map((id) => {
+        const t = data.subjects[id] ?? { correct: 0, total: 0 };
+        const percent = t.total ? Math.round((t.correct / t.total) * 100) : 0;
+        return {
+          "Предмет": subjectLabels[id],
+          "Набрано (балів)": `${t.correct}/${t.total}`,
+          "Відсоток (%)": percent,
+        };
+      });
+
+      const wb = xlsx.utils.book_new();
+      const summarySheet = xlsx.utils.json_to_sheet(subjectRows);
+      xlsx.utils.book_append_sheet(wb, summarySheet, "Зведення");
+
+      const detailRows: Array<Record<string, string | number>> = [];
+      const answerDetails =
+        data.answerDetails ?? ({} as NonNullable<FinalScores["answerDetails"]>);
+      let n = 1;
+      for (const subjId of Object.keys(defaultScores) as SubjectId[]) {
+        const items = answerDetails[subjId] ?? [];
+        for (const item of items) {
+          detailRows.push({
+            "№": n++,
+            "Предмет": subjectLabels[subjId],
+            "Питання": item.questionSnippet ?? "",
+            "Відповідь учня": item.userAnswer ?? "—",
+            "Правильна відповідь": item.correctAnswer ?? "—",
+            "Результат": item.correct ? "Правильно" : "Неправильно",
+            "Мета": item.meta ?? "",
+          });
+        }
+      }
+
+      if (detailRows.length) {
+        const detailsSheet = xlsx.utils.json_to_sheet(detailRows);
+        xlsx.utils.book_append_sheet(wb, detailsSheet, "Деталі");
+      }
+
+      const wbout = xlsx.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${fileBase}.xlsx`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+
+      // PDF (pdfmake)
+      const pdfMakeMod = await import("pdfmake/build/pdfmake");
+      const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
+      const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
+      pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+
+      const pdfDocDefinition: any = {
+        content: [
+          { text: "Результати тесту", style: "title" },
+          {
+            text: `${data.name} · ${gradeLabels[data.grade]} · Запрошення ${data.invitation}`,
+            style: "subtitle",
+          },
+          { text: `Дата: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
+          { text: " ", margin: [0, 10, 0, 6] },
+          { text: "Зведення по предметах", style: "sectionTitle" },
+          {
+            table: {
+              headerRows: 1,
+              widths: ["*", "auto", "auto", "auto"],
+              body: [
+                [
+                  { text: "Предмет", style: "tableHeader" },
+                  { text: "Набрано", style: "tableHeader" },
+                  { text: "%", style: "tableHeader" },
+                  { text: " ", style: "tableHeader" },
+                ],
+                ...((Object.keys(defaultScores) as SubjectId[]).map((id) => {
+                  const t = data.subjects[id] ?? { correct: 0, total: 0 };
+                  const percent = t.total ? Math.round((t.correct / t.total) * 100) : 0;
+                  return [
+                    { text: subjectLabels[id], style: "tableCell" },
+                    { text: `${t.correct}/${t.total}`, style: "tableCell" },
+                    { text: `${percent}%`, style: "tableCell" },
+                    { text: "", style: "tableCell" },
+                  ];
+                })),
+              ],
+            },
+            layout: {
+              fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+            },
+          },
+          { text: " ", margin: [0, 14, 0, 6] },
+          { text: "Детальні відповіді", style: "sectionTitle" },
+          ...(detailRows.length
+            ? [
+                {
+                  table: {
+                    headerRows: 1,
+                    widths: ["auto", "*", "*", "*", "*"],
+                    body: [
+                      [
+                        { text: "№", style: "tableHeader" },
+                        { text: "Предмет", style: "tableHeader" },
+                        { text: "Питання", style: "tableHeader" },
+                        { text: "Відповідь учня", style: "tableHeader" },
+                        { text: "Правильна відповідь", style: "tableHeader" },
+                      ],
+                      ...detailRows.map((r) => [
+                        { text: String(r["№"] ?? ""), style: "tableCell" },
+                        { text: String(r["Предмет"] ?? ""), style: "tableCell" },
+                        { text: String(r["Питання"] ?? ""), style: "tableCell" },
+                        { text: String(r["Відповідь учня"] ?? ""), style: "tableCell" },
+                        { text: String(r["Правильна відповідь"] ?? ""), style: "tableCell" },
+                      ]),
+                    ],
+                  },
+                  layout: {
+                    fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+                  },
+                  wordWrap: true,
+                },
+              ]
+            : [
+                { text: "Деталі відповідей відсутні для цього результату.", style: "meta" },
+              ]),
+        ],
+        styles: {
+          title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
+          subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
+          meta: { fontSize: 9, color: "#6B7280" },
+          sectionTitle: { fontSize: 12, bold: true, color: "#111827", margin: [0, 0, 0, 6] },
+          tableHeader: { fontSize: 9, bold: true, color: "#111827" },
+          tableCell: { fontSize: 8, color: "#111827" },
+        },
+        defaultStyle: {
+          font: "Roboto",
+        },
+        pageSize: "A4",
+        pageMargins: [40, 50, 40, 45],
+      };
+
+      const pdfName = `${fileBase}.pdf`;
+      pdfMake.createPdf(pdfDocDefinition).download(pdfName);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-12">
@@ -124,14 +292,24 @@ export default function ResultsPage() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2"
-          >
-            <Home className="w-5 h-5" />
-            На головну
-          </button>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleSnapshot}
+              disabled={exporting}
+              className="w-full py-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              Зліпок
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium flex items-center justify-center gap-2"
+            >
+              <Home className="w-5 h-5" />
+              На головну
+            </button>
+          </div>
         </div>
       </main>
     </div>
