@@ -20,6 +20,7 @@ export default function AdminResultsPage() {
     index: number;
   } | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadResults = useCallback(() => {
     getStoredResults().then(setResults);
@@ -74,6 +75,172 @@ export default function AdminResultsPage() {
       });
     } catch {
       return iso;
+    }
+  };
+
+  const sanitizeFileName = (value: string) =>
+    value
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .replace(/\s+/g, "_")
+      .slice(0, 80);
+
+  const handleSnapshot = async () => {
+    if (exporting) return;
+    if (!filtered.length) return;
+
+    setExporting(true);
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const fileBase = sanitizeFileName(
+        `results_${gradeFilter === "all" ? "all" : gradeFilter}_${dateStr}`
+      );
+
+      // Excel (xlsx)
+      const xlsxMod = await import("xlsx");
+      const xlsx = xlsxMod.default ?? xlsxMod;
+
+      const summaryRows: Array<Record<string, string | number>> = [];
+      const detailRows: Array<Record<string, string | number>> = [];
+
+      let n = 1;
+      for (const r of filtered) {
+        for (const subjId of subjectIds) {
+          const subj = r.subjects[subjId];
+          const percent = subj.total ? Math.round((subj.correct / subj.total) * 100) : 0;
+          summaryRows.push({
+            "ПІБ": r.name,
+            "Запрошення": r.invitation,
+            "Клас": gradeLabels[r.grade],
+            "Дата": formatDate(r.date),
+            "Предмет": subjectLabels[subjId],
+            "Набрано (балів)": `${subj.correct}/${subj.total}`,
+            "Відсоток (%)": percent,
+          });
+        }
+
+        const answerDetails =
+          r.answerDetails ?? ({} as NonNullable<TestResult["answerDetails"]>);
+        for (const subjId of subjectIds) {
+          const items = answerDetails[subjId] ?? [];
+          for (const item of items) {
+            detailRows.push({
+              "№": n++,
+              "ПІБ": r.name,
+              "Клас": gradeLabels[r.grade],
+              "Дата": formatDate(r.date),
+              "Предмет": subjectLabels[subjId],
+              "Питання": item.questionSnippet ?? "",
+              "Відповідь учня": item.userAnswer ?? "—",
+              "Правильна відповідь": item.correctAnswer ?? "—",
+              "Результат": item.correct ? "Правильно" : "Неправильно",
+              "Мета": item.meta ?? "",
+            });
+          }
+        }
+      }
+
+      const wb = xlsx.utils.book_new();
+      const summarySheet = xlsx.utils.json_to_sheet(summaryRows);
+      xlsx.utils.book_append_sheet(wb, summarySheet, "Зведення");
+
+      if (detailRows.length) {
+        const detailsSheet = xlsx.utils.json_to_sheet(detailRows);
+        xlsx.utils.book_append_sheet(wb, detailsSheet, "Деталі");
+      }
+
+      const wbout = xlsx.write(wb, { bookType: "xlsx", type: "array" });
+      const excelBlob = new Blob([wbout], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const excelUrl = URL.createObjectURL(excelBlob);
+      const excelLink = document.createElement("a");
+      excelLink.href = excelUrl;
+      excelLink.download = `${fileBase}.xlsx`;
+      excelLink.click();
+      setTimeout(() => URL.revokeObjectURL(excelUrl), 500);
+
+      // PDF (pdfmake)
+      const pdfMakeMod = await import("pdfmake/build/pdfmake");
+      const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
+      const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
+      pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+
+      const pdfDocDefinition: any = {
+        content: [
+          { text: "Результати тестувань", style: "title" },
+          {
+            text:
+              gradeFilter === "all"
+                ? "Всі класи"
+                : `Клас: ${gradeLabels[gradeFilter as Grade]}`,
+            style: "subtitle",
+          },
+          { text: `Сформовано: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
+          { text: " ", margin: [0, 12, 0, 8] },
+          { text: "Зведення по учнях", style: "sectionTitle" },
+          {
+            table: {
+              headerRows: 1,
+              widths: ["*", "auto", "auto", "auto", "auto", "auto"],
+              body: [
+                [
+                  { text: "ПІБ", style: "tableHeader" },
+                  { text: "Клас", style: "tableHeader" },
+                  { text: "Дата", style: "tableHeader" },
+                  { text: subjectLabels["ukrainian"], style: "tableHeader" },
+                  { text: subjectLabels["math"], style: "tableHeader" },
+                  { text: subjectLabels["history"], style: "tableHeader" },
+                  // NOTE: english column omitted due to compact widths
+                ],
+                ...filtered.map((r) => {
+                  const u = r.subjects.ukrainian;
+                  const m = r.subjects.math;
+                  const h = r.subjects.history;
+                  return [
+                    { text: r.name, style: "tableCell" },
+                    { text: gradeLabels[r.grade], style: "tableCell" },
+                    { text: formatDate(r.date), style: "tableCell" },
+                    {
+                      text: `${u.correct}/${u.total} (${u.total ? Math.round((u.correct / u.total) * 100) : 0}%)`,
+                      style: "tableCell",
+                    },
+                    {
+                      text: `${m.correct}/${m.total} (${m.total ? Math.round((m.correct / m.total) * 100) : 0}%)`,
+                      style: "tableCell",
+                    },
+                    {
+                      text: `${h.correct}/${h.total} (${h.total ? Math.round((h.correct / h.total) * 100) : 0}%)`,
+                      style: "tableCell",
+                    },
+                  ];
+                }),
+              ],
+            },
+            layout: {
+              fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+            },
+          },
+        ],
+        styles: {
+          title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
+          subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
+          meta: { fontSize: 9, color: "#6B7280" },
+          sectionTitle: { fontSize: 12, bold: true, color: "#111827", margin: [0, 0, 0, 6] },
+          tableHeader: { fontSize: 9, bold: true, color: "#111827" },
+          tableCell: { fontSize: 8, color: "#111827" },
+        },
+        defaultStyle: {
+          font: "Roboto",
+        },
+        pageSize: "A4",
+        pageMargins: [28, 50, 28, 45],
+      };
+
+      const pdfName = `${fileBase}.pdf`;
+      pdfMake.createPdf(pdfDocDefinition).download(pdfName);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -136,6 +303,17 @@ export default function AdminResultsPage() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
             >
               Статистика
+            </button>
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={() => {
+                // Export can be slow; we generate on the client and download files.
+                void handleSnapshot();
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm disabled:opacity-60"
+            >
+              Зліпок
             </button>
             <button
               type="button"
