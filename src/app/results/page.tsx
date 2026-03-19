@@ -153,101 +153,104 @@ export default function ResultsPage() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 500);
 
-      // PDF (pdfmake)
-      const pdfMakeMod = await import("pdfmake/build/pdfmake");
-      const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
-      const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
-      pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
+      try {
+        // PDF (pdfmake)
+        const pdfMakeMod = await import("pdfmake/build/pdfmake");
+        const pdfFontsMod = await import("pdfmake/build/vfs_fonts");
+        const pdfMake = (pdfMakeMod.default ?? pdfMakeMod) as any;
+        pdfMake.vfs = (pdfFontsMod as any).pdfMake.vfs;
 
-      const pdfDocDefinition: any = {
-        content: [
-          { text: "Результати тесту", style: "title" },
-          {
-            text: `${data.name} · ${gradeLabels[data.grade]} · Запрошення ${data.invitation}`,
-            style: "subtitle",
-          },
-          { text: `Дата: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
-          { text: " ", margin: [0, 10, 0, 6] },
-          { text: "Зведення по предметах", style: "sectionTitle" },
-          {
-            table: {
-              headerRows: 1,
-              widths: ["*", "auto", "auto", "auto"],
-              body: [
-                [
-                  { text: "Предмет", style: "tableHeader" },
-                  { text: "Набрано", style: "tableHeader" },
-                  { text: "%", style: "tableHeader" },
-                  { text: " ", style: "tableHeader" },
+        const pdfDocDefinition: any = {
+          content: [
+            { text: "Результати тесту", style: "title" },
+            {
+              text: `${data.name} · ${gradeLabels[data.grade]} · Запрошення ${data.invitation}`,
+              style: "subtitle",
+            },
+            { text: `Дата: ${new Date().toLocaleString("uk-UA")}`, style: "meta" },
+            { text: " ", margin: [0, 10, 0, 6] },
+            { text: "Зведення по предметах", style: "sectionTitle" },
+            {
+              table: {
+                headerRows: 1,
+                widths: ["*", "auto", "auto", "auto"],
+                body: [
+                  [
+                    { text: "Предмет", style: "tableHeader" },
+                    { text: "Набрано", style: "tableHeader" },
+                    { text: "%", style: "tableHeader" },
+                    { text: " ", style: "tableHeader" },
+                  ],
+                  ...((Object.keys(defaultScores) as SubjectId[]).map((id) => {
+                    const t = data.subjects[id] ?? { correct: 0, total: 0 };
+                    const percent = t.total ? Math.round((t.correct / t.total) * 100) : 0;
+                    return [
+                      { text: subjectLabels[id], style: "tableCell" },
+                      { text: `${t.correct}/${t.total}`, style: "tableCell" },
+                      { text: `${percent}%`, style: "tableCell" },
+                      { text: "", style: "tableCell" },
+                    ];
+                  })),
                 ],
-                ...((Object.keys(defaultScores) as SubjectId[]).map((id) => {
-                  const t = data.subjects[id] ?? { correct: 0, total: 0 };
-                  const percent = t.total ? Math.round((t.correct / t.total) * 100) : 0;
-                  return [
-                    { text: subjectLabels[id], style: "tableCell" },
-                    { text: `${t.correct}/${t.total}`, style: "tableCell" },
-                    { text: `${percent}%`, style: "tableCell" },
-                    { text: "", style: "tableCell" },
-                  ];
-                })),
-              ],
+              },
+              layout: {
+                fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+              },
             },
-            layout: {
-              fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
-            },
-          },
-          { text: " ", margin: [0, 14, 0, 6] },
-          { text: "Детальні відповіді", style: "sectionTitle" },
-          ...(detailRows.length
-            ? [
-                {
-                  table: {
-                    headerRows: 1,
-                    widths: ["auto", "*", "*", "*", "*"],
-                    body: [
-                      [
-                        { text: "№", style: "tableHeader" },
-                        { text: "Предмет", style: "tableHeader" },
-                        { text: "Питання", style: "tableHeader" },
-                        { text: "Відповідь учня", style: "tableHeader" },
-                        { text: "Правильна відповідь", style: "tableHeader" },
+            { text: " ", margin: [0, 14, 0, 6] },
+            { text: "Детальні відповіді", style: "sectionTitle" },
+            ...(detailRows.length
+              ? [
+                  {
+                    table: {
+                      headerRows: 1,
+                      widths: ["auto", "*", "*", "*", "*"],
+                      body: [
+                        [
+                          { text: "№", style: "tableHeader" },
+                          { text: "Предмет", style: "tableHeader" },
+                          { text: "Питання", style: "tableHeader" },
+                          { text: "Відповідь учня", style: "tableHeader" },
+                          { text: "Правильна відповідь", style: "tableHeader" },
+                        ],
+                        ...detailRows.map((r) => [
+                          { text: String(r["№"] ?? ""), style: "tableCell" },
+                          { text: String(r["Предмет"] ?? ""), style: "tableCell" },
+                          { text: String(r["Питання"] ?? ""), style: "tableCell" },
+                          { text: String(r["Відповідь учня"] ?? ""), style: "tableCell" },
+                          { text: String(r["Правильна відповідь"] ?? ""), style: "tableCell" },
+                        ]),
                       ],
-                      ...detailRows.map((r) => [
-                        { text: String(r["№"] ?? ""), style: "tableCell" },
-                        { text: String(r["Предмет"] ?? ""), style: "tableCell" },
-                        { text: String(r["Питання"] ?? ""), style: "tableCell" },
-                        { text: String(r["Відповідь учня"] ?? ""), style: "tableCell" },
-                        { text: String(r["Правильна відповідь"] ?? ""), style: "tableCell" },
-                      ]),
-                    ],
+                    },
+                    layout: {
+                      fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
+                    },
+                    wordWrap: true,
                   },
-                  layout: {
-                    fillColor: (rowIndex: number) => (rowIndex === 0 ? "#F3F4F6" : null),
-                  },
-                  wordWrap: true,
-                },
-              ]
-            : [
-                { text: "Деталі відповідей відсутні для цього результату.", style: "meta" },
-              ]),
-        ],
-        styles: {
-          title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
-          subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
-          meta: { fontSize: 9, color: "#6B7280" },
-          sectionTitle: { fontSize: 12, bold: true, color: "#111827", margin: [0, 0, 0, 6] },
-          tableHeader: { fontSize: 9, bold: true, color: "#111827" },
-          tableCell: { fontSize: 8, color: "#111827" },
-        },
-        defaultStyle: {
-          font: "Roboto",
-        },
-        pageSize: "A4",
-        pageMargins: [40, 50, 40, 45],
-      };
+                ]
+              : [{ text: "Деталі відповідей відсутні для цього результату.", style: "meta" }]),
+          ],
+          styles: {
+            title: { fontSize: 18, bold: true, margin: [0, 0, 0, 6] },
+            subtitle: { fontSize: 11, bold: true, color: "#374151", margin: [0, 0, 0, 2] },
+            meta: { fontSize: 9, color: "#6B7280" },
+            sectionTitle: { fontSize: 12, bold: true, color: "#111827", margin: [0, 0, 0, 6] },
+            tableHeader: { fontSize: 9, bold: true, color: "#111827" },
+            tableCell: { fontSize: 8, color: "#111827" },
+          },
+          defaultStyle: {
+            font: "Roboto",
+          },
+          pageSize: "A4",
+          pageMargins: [40, 50, 40, 45],
+        };
 
-      const pdfName = `${fileBase}.pdf`;
-      pdfMake.createPdf(pdfDocDefinition).download(pdfName);
+        const pdfName = `${fileBase}.pdf`;
+        pdfMake.createPdf(pdfDocDefinition).download(pdfName);
+      } catch (err) {
+        console.error("PDF export failed:", err);
+        alert("Excel сформувався, але PDF не вийшов. Перевірте консоль (F12).");
+      }
     } finally {
       setExporting(false);
     }
